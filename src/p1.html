@@ -1,0 +1,225 @@
+<!--title:Partie 1 · Le déclic-->
+<div class="kicker">Partie 1 sur 8 · 09:00 – 09:50</div>
+<h1>Le déclic</h1>
+<p class="lead">Tu as déjà écrit un <code>main.tf</code>. Ici, tu comprends ce qu'il fait vraiment : le cycle <b>init → plan → apply → destroy</b>, et la place du state.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Expliquer l'infrastructure as code et le rôle de Terraform en une phrase.</li>
+<li>Enchaîner <code>init</code>, <code>plan</code>, <code>apply</code>, <code>destroy</code> et lire les symboles du plan.</li>
+<li>Lire un <code>main.tf</code> : bloc <code>terraform</code>, <code>variable</code>, <code>resource</code>, <code>output</code>.</li>
+</ul></div>
+
+<h2>1.1 L'idée</h2>
+<p>Terraform est, selon sa documentation, « un outil d'infrastructure as code qui permet de construire, modifier et versionner des ressources cloud et on-prem de façon sûre et efficace ». Tu <b>décris</b> l'état voulu dans des fichiers texte ; Terraform calcule comment y arriver.</p>
+<div class="box doc"><span class="t">Dans la doc officielle</span>
+<p>Configurations <b>déclaratives</b> : elles décrivent l'état final souhaité. Terraform construit un graphe de ressources et travaille en parallèle sur celles qui sont indépendantes. Les fichiers peuvent être versionnés dans Git, réutilisés et partagés.</p>
+<p class="src">developer.hashicorp.com/terraform/intro</p></div>
+
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 330" role="img" aria-label="Boucle Write, Plan, Apply avec le state et les providers">
+  <defs><marker id="a1" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="c-acc" x="20" y="40" width="200" height="90" rx="16"/>
+  <text x="120" y="76" text-anchor="middle" class="b t-acc" font-size="20">1. WRITE</text>
+  <text x="120" y="102" text-anchor="middle" font-size="14">tu décris les ressources</text>
+  <text x="120" y="120" text-anchor="middle" class="m mut" font-size="12">fichiers .tf</text>
+  <rect class="c-chg" x="300" y="40" width="200" height="90" rx="16"/>
+  <text x="400" y="76" text-anchor="middle" class="b t-chg" font-size="20">2. PLAN</text>
+  <text x="400" y="102" text-anchor="middle" font-size="14">Terraform compare et propose</text>
+  <text x="400" y="120" text-anchor="middle" class="m mut" font-size="12">aucune modification</text>
+  <rect class="c-add" x="580" y="40" width="200" height="90" rx="16"/>
+  <text x="680" y="76" text-anchor="middle" class="b t-add" font-size="20">3. APPLY</text>
+  <text x="680" y="102" text-anchor="middle" font-size="14">après ton accord, il exécute</text>
+  <text x="680" y="120" text-anchor="middle" class="m mut" font-size="12">dans le bon ordre</text>
+  <path class="ln" d="M220 85 L296 85" marker-end="url(#a1)"/>
+  <path class="ln" d="M500 85 L576 85" marker-end="url(#a1)"/>
+  <path class="ln" d="M680 130 L680 160 L120 160 L120 134" marker-end="url(#a1)" stroke-dasharray="6 5"/>
+  <text x="270" y="150" text-anchor="middle" class="mut" font-size="13">tu modifies, tu recommences</text>
+  <rect class="c-rep" x="270" y="200" width="260" height="62" rx="14"/>
+  <text x="400" y="228" text-anchor="middle" class="b t-rep" font-size="17">STATE (terraform.tfstate)</text>
+  <text x="400" y="248" text-anchor="middle" font-size="13">le lien entre ta config et le réel</text>
+  <rect class="bx" x="570" y="200" width="210" height="62" rx="14"/>
+  <text x="675" y="228" text-anchor="middle" class="b" font-size="16">Provider → API</text>
+  <text x="675" y="248" text-anchor="middle" class="mut" font-size="13">cloud, Docker, fichiers…</text>
+  <path class="ln" d="M400 134 L400 196" marker-end="url(#a1)"/>
+  <path class="ln" d="M680 134 L680 196" marker-end="url(#a1)"/>
+  <text x="400" y="300" text-anchor="middle" class="mut" font-size="13">Le plan lit le state et interroge le provider ; l'apply les met à jour.</text>
+</svg></div>
+<figcaption>Le workflow cœur de Terraform : Write, Plan, Apply (doc officielle), avec le state au centre.</figcaption>
+</figure>
+
+<h2>1.2 Les commandes du cycle</h2>
+<div class="tbl"><table>
+<tr><th>Commande</th><th>Ce qu'elle fait (doc officielle)</th></tr>
+<tr><td><code>terraform init</code></td><td>Initialise le backend, installe les modules enfants, télécharge les providers. « Sans danger à relancer » : ne supprime jamais configuration ni state.</td></tr>
+<tr><td><code>terraform fmt</code></td><td>Réécrit les fichiers au format canonique.</td></tr>
+<tr><td><code>terraform validate</code></td><td>Vérifie syntaxe et cohérence interne. Ne contacte pas les services distants.</td></tr>
+<tr><td><code>terraform plan</code></td><td>Compare configuration et infrastructure réelle (state + API du provider). <b>Ne fait aucun changement.</b> Peut sauver le plan dans un fichier.</td></tr>
+<tr><td><code>terraform apply</code></td><td>Lance un plan, demande confirmation, puis exécute via l'API du provider. Accepte aussi un fichier de plan.</td></tr>
+<tr><td><code>terraform destroy</code></td><td>Supprime toutes les ressources gérées par le répertoire courant et le workspace sélectionné (après confirmation).</td></tr>
+</table></div>
+
+<h3>Lire un plan : quatre symboles</h3>
+<div class="legend" aria-label="Symboles du plan">
+<span class="a">+ create</span><span class="c">~ update in place</span><span class="d">- destroy</span><span class="r">-/+ replace</span></div>
+<p>Ce code couleur sert de fil rouge à tout le site : vert = on crée, ambre = on modifie, rouge = on détruit, violet = on remplace (détruire puis recréer).</p>
+
+<h2>1.3 Anatomie d'un main.tf</h2>
+<p>Voici le fichier que tu vas utiliser dans le TD. Il utilise deux providers sans aucun compte cloud : <code>random</code> (génère un nom) et <code>local</code> (écrit un fichier).</p>
+
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+variable "nom" {
+  type        = string
+  description = "Nom a saluer"
+  default     = "Terraform"
+}
+
+resource "random_pet" "serveur" {
+  length = 2
+}
+
+resource "local_file" "salut" {
+  filename = "${path.module}/salut.txt"
+  content  = "Bonjour ${var.nom} ! Serveur : ${random_pet.serveur.id}\n"
+}
+
+output "chemin" {
+  value = local_file.salut.filename
+}
+</pre>
+
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 300" role="img" aria-label="Les quatre types de blocs du fichier et leurs liens">
+  <defs><marker id="a2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="c-acc" x="20" y="20" width="230" height="70" rx="12"/>
+  <text x="135" y="48" text-anchor="middle" class="b t-acc m" font-size="15">terraform { }</text>
+  <text x="135" y="70" text-anchor="middle" font-size="12.5">quels providers, quelles versions</text>
+  <rect class="bx" x="20" y="130" width="230" height="70" rx="12"/>
+  <text x="135" y="158" text-anchor="middle" class="b m" font-size="15">variable "nom"</text>
+  <text x="135" y="180" text-anchor="middle" font-size="12.5">une entrée (var.nom)</text>
+  <rect class="c-add" x="300" y="20" width="230" height="70" rx="12"/>
+  <text x="415" y="48" text-anchor="middle" class="b t-add m" font-size="15">resource random_pet</text>
+  <text x="415" y="70" text-anchor="middle" font-size="12.5">« serveur » → un nom aléatoire</text>
+  <rect class="c-add" x="300" y="130" width="230" height="70" rx="12"/>
+  <text x="415" y="158" text-anchor="middle" class="b t-add m" font-size="15">resource local_file</text>
+  <text x="415" y="180" text-anchor="middle" font-size="12.5">« salut » → écrit salut.txt</text>
+  <rect class="c-chg" x="570" y="130" width="210" height="70" rx="12"/>
+  <text x="675" y="158" text-anchor="middle" class="b t-chg m" font-size="15">output "chemin"</text>
+  <text x="675" y="180" text-anchor="middle" font-size="12.5">une sortie affichée à la fin</text>
+  <path class="ln" d="M250 165 L296 165" marker-end="url(#a2)"/>
+  <text x="272" y="156" text-anchor="middle" class="m mut" font-size="11">var.nom</text>
+  <path class="ln" d="M415 90 L415 126" marker-end="url(#a2)"/>
+  <text x="470" y="112" text-anchor="middle" class="m mut" font-size="11">.id</text>
+  <path class="ln" d="M530 165 L566 165" marker-end="url(#a2)"/>
+  <text x="548" y="156" text-anchor="middle" class="m mut" font-size="11">.filename</text>
+  <text x="400" y="250" text-anchor="middle" font-size="14">Une flèche = une référence. Terraform en déduit l'ordre : le nom aléatoire d'abord, puis le fichier, puis la sortie.</text>
+  <text x="400" y="274" text-anchor="middle" class="mut" font-size="13">C'est une dépendance implicite (partie 3).</text>
+</svg></div>
+<figcaption>Quatre types de blocs, reliés par des références.</figcaption>
+</figure>
+
+<div class="box retenir"><span class="t">À retenir</span>
+<ul>
+<li>Un bloc <code>resource "TYPE" "LABEL"</code> : le couple TYPE + LABEL est l'identité de la ressource dans le state.</li>
+<li>On lit un attribut avec <code>TYPE.LABEL.ATTRIBUT</code> (ici <code>random_pet.serveur.id</code>).</li>
+<li><code>${path.module}</code> est le dossier du module où l'expression est écrite.</li>
+<li>Après <code>init</code>, le dossier contient <code>.terraform/</code> (providers téléchargés) et <code>.terraform.lock.hcl</code>.</li>
+</ul></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 1</span><h3>Ton premier cycle complet</h3><span class="dur">≈ 20 min · aucun compte cloud</span></div>
+<p>Tout est vérifié avec Terraform 1.17.0. Les noms aléatoires (<code>suitable-tiger</code>) seront différents chez toi.</p>
+<ol class="steps">
+<li><b>Prépare le dossier.</b> Crée un dossier vide et colle-y le <code>main.tf</code> ci-dessus.
+<pre class="code" data-l="sh">
+$ mkdir td1 &amp;&amp; cd td1
+$ nano main.tf        # ou ton éditeur : colle le fichier de la section 1.3
+</pre></li>
+<li><b>Initialise.</b> Terraform télécharge les deux providers.
+<pre class="code" data-l="sh">
+$ terraform init
+</pre>
+<p class="expect">Attendu : « Terraform has been successfully initialized! ». Fais <code>ls -a</code> : tu vois <code>.terraform</code> et <code>.terraform.lock.hcl</code>.</p></li>
+<li><b>Formate, valide, planifie.</b> Sauve le plan dans un fichier.
+<pre class="code" data-l="sh">
+$ terraform fmt -check
+$ terraform validate
+$ terraform plan -out=tfplan
+</pre>
+<pre class="code" data-l="out" data-file="extrait du plan">
+  # local_file.salut will be created
+  + resource "local_file" "salut" {
+      + content              = (known after apply)
+      + filename             = "./salut.txt"
+      ...
+    }
+
+  # random_pet.serveur will be created
+  + resource "random_pet" "serveur" {
+      + id        = (known after apply)
+      + length    = 2
+      + separator = "-"
+    }
+
+Plan: 2 to add, 0 to change, 0 to destroy.
+</pre>
+<p class="expect">Question : pourquoi <code>content</code> est-il « known after apply » ? Parce qu'il dépend de <code>random_pet.serveur.id</code>, qui n'existe pas encore.</p></li>
+<li><b>Applique le plan sauvegardé, puis observe.</b>
+<pre class="code" data-l="sh">
+$ terraform apply tfplan
+$ terraform state list
+$ terraform output
+$ cat salut.txt
+</pre>
+<pre class="code" data-l="out" data-file="résultat">
+random_pet.serveur: Creating...
+random_pet.serveur: Creation complete after 0s [id=suitable-tiger]
+local_file.salut: Creating...
+Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
+
+chemin = "./salut.txt"
+Bonjour Terraform ! Serveur : suitable-tiger
+</pre>
+<p class="expect">Remarque : le <code>random_pet</code> est créé <b>avant</b> le <code>local_file</code>. Le plan sauvegardé s'applique sans te redemander confirmation.</p></li>
+<li><b>Change une entrée, regarde le symbole, puis détruis.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -var nom=Alex
+</pre>
+<pre class="code" data-l="out" data-file="extrait du plan">
+  # local_file.salut must be replaced
+-/+ resource "local_file" "salut" {
+      ~ content              = &lt;&lt;-EOT # forces replacement
+          - Bonjour Terraform ! Serveur : suitable-tiger
+          + Bonjour Alex ! Serveur : suitable-tiger
+        EOT
+      ...
+Plan: 1 to add, 0 to change, 1 to destroy.
+</pre>
+<p>Tu viens de voir un <b>remplacement</b> (<code>-/+</code>) : changer <code>content</code> impose de recréer le fichier. Maintenant nettoie :</p>
+<pre class="code" data-l="sh">
+$ terraform destroy
+</pre>
+<p class="expect">Tape <code>yes</code>. Résultat attendu : « Destroy complete! Resources: 2 destroyed. »</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<ul><li>Relance <code>terraform plan</code> sans rien changer : que dit-il ? (« No changes ».)</li>
+<li>Applique de nouveau, supprime <code>salut.txt</code> à la main, puis relance <code>plan</code> : Terraform compare avec le réel et planifie de recréer le fichier (« will be created », observé).</li></ul></details>
+</div>
+
+<h2>Mini-quiz de la partie 1</h2>
+<div class="quiz" data-p="1"></div>

@@ -1,0 +1,201 @@
+<!--title:Partie 3 · Providers, ressources, dépendances-->
+<div class="kicker">Partie 3 sur 8 · 11:10 – 12:00</div>
+<h1>Providers, ressources, dépendances</h1>
+<p class="lead">Terraform ne sait rien faire seul : ce sont les <b>providers</b> qui parlent aux plateformes. Tu déclares leurs versions, tu décris des <b>resources</b>, tu lis des <b>data sources</b>, et Terraform déduit l'ordre grâce aux <b>dépendances</b>.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Déclarer un provider avec <code>required_providers</code> et une contrainte de version.</li>
+<li>Distinguer <code>resource</code> et <code>data</code>, et lire leurs attributs.</li>
+<li>Prédire l'ordre de création et comprendre un remplacement en cascade.</li>
+</ul></div>
+
+<h2>3.1 Déclarer ses providers</h2>
+<pre class="code" data-l="hcl" data-file="terraform.tf">
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+</pre>
+<ul>
+<li><b>Clé (<code>local</code>)</b> : le nom local du provider dans ce module.</li>
+<li><b><code>source</code></b> : adresse globale <code>[HOSTNAME/]NAMESPACE/TYPE</code>. Sans hostname, c'est <code>registry.terraform.io</code> : <code>hashicorp/http</code> est un raccourci de <code>registry.terraform.io/hashicorp/http</code>.</li>
+<li><b><code>version</code></b> : une contrainte, facultative mais fortement recommandée. La doc conseille <code>~></code> dans un module racine, <code>&gt;=</code> dans un module réutilisable.</li>
+</ul>
+<p>Un bloc <code>provider "nom" { … }</code> sert ensuite à <b>configurer</b> le provider (authentification, région…). Certains, comme <code>random</code> et <code>local</code>, n'ont rien à configurer.</p>
+
+<h3>Lire une contrainte de version</h3>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 270" role="img" aria-label="Versions autorisées par ~> 1.0.4 et ~> 1.1">
+  <text x="20" y="28" class="b" font-size="15">version = "~> 1.0.4"   →  seul le dernier composant augmente</text>
+  <line class="ln" x1="30" y1="70" x2="770" y2="70"/>
+  <g font-size="13" class="m">
+    <rect class="c-del" x="40" y="52" width="110" height="36" rx="8"/><text x="95" y="75" text-anchor="middle">1.0.3</text>
+    <rect class="c-add" x="190" y="52" width="110" height="36" rx="8"/><text x="245" y="75" text-anchor="middle">1.0.4</text>
+    <rect class="c-add" x="340" y="52" width="110" height="36" rx="8"/><text x="395" y="75" text-anchor="middle">1.0.5</text>
+    <rect class="c-add" x="490" y="52" width="110" height="36" rx="8"/><text x="545" y="75" text-anchor="middle">1.0.10</text>
+    <rect class="c-del" x="640" y="52" width="110" height="36" rx="8"/><text x="695" y="75" text-anchor="middle">1.1.0</text>
+  </g>
+  <text x="20" y="150" class="b" font-size="15">version = "~> 1.1"   →  le deuxième composant peut augmenter, pas le premier</text>
+  <line class="ln" x1="30" y1="192" x2="770" y2="192"/>
+  <g font-size="13" class="m">
+    <rect class="c-del" x="40" y="174" width="110" height="36" rx="8"/><text x="95" y="197" text-anchor="middle">1.0</text>
+    <rect class="c-add" x="190" y="174" width="110" height="36" rx="8"/><text x="245" y="197" text-anchor="middle">1.1</text>
+    <rect class="c-add" x="340" y="174" width="110" height="36" rx="8"/><text x="395" y="197" text-anchor="middle">1.2</text>
+    <rect class="c-add" x="490" y="174" width="110" height="36" rx="8"/><text x="545" y="197" text-anchor="middle">1.10</text>
+    <rect class="c-del" x="640" y="174" width="110" height="36" rx="8"/><text x="695" y="197" text-anchor="middle">2.0</text>
+  </g>
+  <text x="400" y="252" text-anchor="middle" class="mut" font-size="13">vert = autorisé · rouge = refusé (exemples de la doc officielle)</text>
+</svg></div>
+<figcaption>L'opérateur <code>~></code> (« pessimiste ») bloque le composant juste avant le dernier.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Opérateur</th><th>Sens</th></tr>
+<tr><td><code>=</code> (ou rien)</td><td>une seule version exacte (ne se combine pas)</td></tr>
+<tr><td><code>!=</code></td><td>exclut une version exacte</td></tr>
+<tr><td><code>&gt;</code> <code>&gt;=</code> / <code>&lt;</code> <code>&lt;=</code></td><td>plus récent / plus ancien que la version donnée</td></tr>
+<tr><td><code>~&gt;</code></td><td>seul le composant le plus à droite peut augmenter</td></tr>
+</table></div>
+<p>On combine avec des virgules dans une même chaîne : <code>version = "&gt;= 1.2.0, &lt; 2.0.0"</code>.</p>
+
+<div class="box doc"><span class="t">Le fichier de verrouillage</span>
+<p>Après <code>init</code>, les versions réellement choisies sont enregistrées dans <code>.terraform.lock.hcl</code>. La doc recommande de le <b>committer</b> : tout le monde (et la CI) obtient alors les mêmes versions. Pour monter de version, change la contrainte puis relance <code>terraform init</code> (ou <code>init -upgrade</code>).</p>
+<p class="src">developer.hashicorp.com/terraform/language/providers/requirements · /cli/commands/init</p></div>
+
+<h2>3.2 Resource : créer et gérer</h2>
+<pre class="code" data-l="hcl">
+resource "local_file" "salut" {     # TYPE + LABEL
+  filename = "${path.module}/salut.txt"   # arguments : propres au provider
+  content  = "Serveur : ${random_pet.serveur.id}\n"
+}
+</pre>
+<p>La doc : « Terraform utilise ce label pour suivre la ressource dans ton state ». Les arguments dépendent du provider : cherche-les dans sa documentation (Terraform Registry). Les <b>méta-arguments</b> valables sur toute ressource sont <code>count</code>, <code>for_each</code>, <code>depends_on</code>, <code>provider</code> et le bloc <code>lifecycle</code> (partie 5).</p>
+
+<h2>3.3 Data source : lire sans toucher</h2>
+<pre class="code" data-l="hcl">
+data "local_file" "relu" {
+  filename = local_file.salut.filename
+}
+# se lit : data.local_file.relu.content
+</pre>
+<p>« Les data sources récupèrent des données du provider mais ne créent ni ne modifient aucune ressource. » Terraform essaie de les lire <b>pendant le plan</b>. Si un argument dépend d'une ressource qui va changer, la lecture est reportée à l'apply : le plan affiche alors « will be read during apply » (observé dans le TD).</p>
+
+<h2>3.4 Les dépendances</h2>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 250" role="img" aria-label="Ordre de création déduit des références">
+  <defs><marker id="a3" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="c-add" x="20" y="60" width="220" height="80" rx="14"/>
+  <text x="130" y="94" text-anchor="middle" class="b m t-add" font-size="15">random_pet.serveur</text>
+  <text x="130" y="116" text-anchor="middle" font-size="13">créé en premier</text>
+  <rect class="c-add" x="290" y="60" width="220" height="80" rx="14"/>
+  <text x="400" y="94" text-anchor="middle" class="b m t-add" font-size="15">local_file.salut</text>
+  <text x="400" y="116" text-anchor="middle" font-size="13">lit random_pet.serveur.id</text>
+  <rect class="c-acc" x="560" y="60" width="220" height="80" rx="14"/>
+  <text x="670" y="94" text-anchor="middle" class="b m t-acc" font-size="15">data.local_file.relu</text>
+  <text x="670" y="116" text-anchor="middle" font-size="13">lit local_file.salut.filename</text>
+  <path class="ln" d="M240 100 L286 100" marker-end="url(#a3)"/>
+  <path class="ln" d="M510 100 L556 100" marker-end="url(#a3)"/>
+  <text x="400" y="190" text-anchor="middle" font-size="14">On détruit dans l'ordre inverse. Si <tspan class="b t-rep">random_pet</tspan> est remplacé, tout ce qui en dépend l'est aussi.</text>
+  <text x="400" y="216" text-anchor="middle" class="mut" font-size="13">Cela vient de <tspan class="m">terraform graph</tspan> : "data.local_file.relu" → "local_file.salut" → "random_pet.serveur"</text>
+</svg></div>
+<figcaption>Dépendances implicites : une référence suffit, tu n'as rien d'autre à déclarer.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th></th><th>Dépendance implicite</th><th>Dépendance explicite (<code>depends_on</code>)</th></tr>
+<tr><td>Comment</td><td>Tu références un attribut d'une autre ressource</td><td><code>depends_on = [aws_iam_role_policy.example]</code></td></tr>
+<tr><td>Quand</td><td>Toujours, c'est le cas normal</td><td>Dépendance <b>cachée</b> que Terraform ne peut pas inférer</td></tr>
+<tr><td>Prix</td><td>Aucun</td><td>« Dernier recours » : plans plus conservateurs</td></tr>
+</table></div>
+
+<div class="box attention"><span class="t">Piège</span>
+<p>Changer un argument qui <b>force un remplacement</b> (<code># forces replacement</code>, symbole <code>-/+</code>) détruit puis recrée la ressource, et entraîne ses dépendants. C'est ce que tu observes dans le TD avec <code>-replace</code>.</p></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 3</span><h3>Ordre, data source et remplacement en cascade</h3><span class="dur">≈ 25 min · aucun compte cloud</span></div>
+<ol class="steps">
+<li><b>Crée le projet.</b> Dans un dossier <code>td3</code>, écris ce <code>main.tf</code>.
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+resource "random_pet" "serveur" {
+  length = 2
+}
+
+resource "local_file" "salut" {
+  filename = "${path.module}/salut.txt"
+  content  = "Serveur : ${random_pet.serveur.id}\n"
+}
+
+data "local_file" "relu" {
+  filename = local_file.salut.filename
+}
+
+output "contenu_relu" {
+  value = data.local_file.relu.content
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+$ grep -A2 'hashicorp/random' .terraform.lock.hcl
+</pre>
+<p class="expect">Le lock file indique la version précise choisie (chez moi 3.9.1 pour la contrainte <code>~&gt; 3.6</code>).</p></li>
+<li><b>Planifie et repère la data source différée.</b>
+<pre class="code" data-l="sh">
+$ terraform plan
+</pre>
+<pre class="code" data-l="out" data-file="extrait">
+  # data.local_file.relu will be read during apply
+  # (depends on a resource or a module with changes pending)
+  # local_file.salut will be created
+  # random_pet.serveur will be created
+Plan: 2 to add, 0 to change, 0 to destroy.
+</pre>
+<p class="expect">Question : pourquoi la data source n'est-elle pas lue tout de suite ? Parce que <code>local_file.salut</code> n'existe pas encore.</p></li>
+<li><b>Applique et lis la sortie.</b>
+<pre class="code" data-l="sh">
+$ terraform apply -auto-approve
+$ terraform output contenu_relu
+</pre>
+<p class="expect">Tu retrouves « Serveur : &lt;nom-aléatoire&gt; ». La data source a bien relu le fichier créé juste avant.</p></li>
+<li><b>Affiche le graphe.</b>
+<pre class="code" data-l="sh">
+$ terraform graph
+</pre>
+<p class="expect">Cherche les lignes avec <code>-&gt;</code> : <code>"data.local_file.relu" -&gt; "local_file.salut"</code> et <code>"local_file.salut" -&gt; "random_pet.serveur"</code>. En option, si tu installes Graphviz (<code>sudo apt install graphviz</code>) : <code>terraform graph | dot -Tpng &gt; graphe.png</code>.</p></li>
+<li><b>Force un remplacement et mesure la cascade.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -replace=random_pet.serveur
+</pre>
+<pre class="code" data-l="out" data-file="extrait">
+  # data.local_file.relu will be read during apply
+  # local_file.salut must be replaced
+  # random_pet.serveur will be replaced, as requested
+Plan: 2 to add, 0 to change, 2 to destroy.
+</pre>
+<p class="expect">Tu n'as demandé que <code>random_pet</code>, mais <code>local_file</code> est remplacé aussi puisque son contenu en dépend. Nettoie avec <code>terraform destroy</code>.</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<p>Change <code>version = "~&gt; 3.6"</code> en <code>version = "~&gt; 99.0"</code> puis relance <code>terraform init</code> : l'erreur te montre comment une contrainte impossible est refusée. Remets la bonne valeur ensuite.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 3</h2>
+<div class="quiz" data-p="3"></div>

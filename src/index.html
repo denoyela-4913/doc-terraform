@@ -1,0 +1,55 @@
+<!--title:Terraform en un jour-->
+<section class="hero">
+<div class="kicker">Formation complémentaire · une journée</div>
+<h1>Terraform <em>en un jour</em></h1>
+<p class="lead">Un parcours en 8 parties pour comprendre Terraform et progresser vite : schémas en couleur, TD vérifiés sur ta machine, flashcards, mindmap, fiche de référence, pièges et BD. Tout vient de la documentation officielle HashiCorp (v1.17.x) ou d'exécutions réelles.</p>
+<div class="legend" aria-label="Code couleur du site">
+<span class="a">+ on crée</span><span class="c">~ on modifie</span><span class="d">- on détruit</span><span class="r">-/+ on remplace</span></div>
+<p class="src">Ce code couleur vient du <code>terraform plan</code> et sert de fil rouge à tous les schémas.</p>
+</section>
+
+<h2>La journée, heure par heure</h2>
+<ol class="day">
+<li class="pause">Avant de commencer : <code>terraform version</code> doit répondre (v1.17.x). Docker n'est nécessaire que pour la dernière partie.</li>
+<li><a class="card" href="p1.html"><div class="h"><b>1 · Le déclic</b><time>09:00 – 09:50</time></div><p>IaC, le cycle init → plan → apply → destroy, ton premier main.tf lu ligne à ligne.</p><div class="prog"><i data-prog="1"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p2.html"><div class="h"><b>2 · Parler HCL</b><time>10:05 – 10:55</time></div><p>Blocs, types, références, conditions, expressions for, fonctions et la console.</p><div class="prog"><i data-prog="2"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p3.html"><div class="h"><b>3 · Providers, ressources, dépendances</b><time>11:10 – 12:00</time></div><p>required_providers, contraintes de version, resource vs data, graphe de dépendances.</p><div class="prog"><i data-prog="3"></i></div></a></li>
+<li class="pause">Déjeuner · 1 h 30</li>
+<li><a class="card" href="p4.html"><div class="h"><b>4 · Variables, locals, outputs</b><time>13:30 – 14:20</time></div><p>Validation, précédence des valeurs, valeurs sensibles, sorties.</p><div class="prog"><i data-prog="4"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p5.html"><div class="h"><b>5 · Boucles et cycle de vie</b><time>14:35 – 15:25</time></div><p>count, for_each, dynamic, lifecycle. Pourquoi retirer un élément du milieu fait mal avec count.</p><div class="prog"><i data-prog="5"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p6.html"><div class="h"><b>6 · State, backends, refactoring</b><time>15:40 – 16:30</time></div><p>La mémoire de Terraform : backends, commandes state, moved, import, dérive, workspaces.</p><div class="prog"><i data-prog="6"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p7.html"><div class="h"><b>7 · Modules et qualité</b><time>16:45 – 17:35</time></div><p>Factoriser, conventions de style, fmt, validate, terraform test.</p><div class="prog"><i data-prog="7"></i></div></a></li>
+<li class="pause">Pause · 15 min</li>
+<li><a class="card" href="p8.html"><div class="h"><b>8 · Pro : sécurité, CI, projet final</b><time>17:50 – 18:50</time></div><p>Secrets et state, automatisation, débogage, puis un vrai conteneur nginx avec Docker.</p><div class="prog"><i data-prog="8"></i></div></a></li>
+<li><a class="card" href="quiz.html"><div class="h"><b>Finale · quiz et flashcards</b><time>18:50 – 19:20</time></div><p>24 questions mélangées, puis les cartes que tu as marquées « à revoir ».</p></a></li>
+</ol>
+
+<h2>Les outils d'apprentissage</h2>
+<p>À utiliser pendant la journée, ou le lendemain pour fixer.</p>
+<div class="grid">
+<a class="card tool" href="flashcards.html"><div class="ico">75</div><div class="h"><b>Flashcards</b></div><p>Question d'un côté, réponse de l'autre. Marque ce que tu sais. <span id="hub-fc"></span></p></a>
+<a class="card tool" href="mindmap.html"><div class="ico">◎</div><div class="h"><b>Mindmap</b></div><p>Tout Terraform sur une page, branche par branche, avec liens vers les parties.</p></a>
+<a class="card tool" href="fiche.html"><div class="ico">⌘</div><div class="h"><b>Fiche de référence</b></div><p>Commandes, blocs, types, précédence, contraintes de version, variables d'environnement.</p></a>
+<a class="card tool" href="bd.html"><div class="ico">▦</div><div class="h"><b>BD</b></div><p>Cinq planches avec Léa et Terra : plan, state, count/for_each, modules, secrets.</p></a>
+<a class="card tool" href="pieges.html"><div class="ico">!</div><div class="h"><b>Pièges et astuces</b></div><p>Ce qu'il ne faut pas faire, et les bons réflexes, chacun avec sa source.</p></a>
+<a class="card tool" href="quiz.html"><div class="ico">24</div><div class="h"><b>Quiz final</b></div><p>Toutes les parties mélangées, avec l'explication de chaque réponse.</p></a>
+</div>
+
+<div class="box doc"><span class="t">Pourquoi tu peux t'y fier</span>
+<ul>
+<li><b>Le fond vient de la doc officielle</b> (developer.hashicorp.com, v1.17.x) : chaque affirmation importante renvoie à sa page. Voir les <a href="sources.html">sources</a>.</li>
+<li><b>Chaque TD a été exécuté</b> avec Terraform 1.17 (providers <code>random</code>, <code>local</code>, <code>docker</code>). Les sorties marquées « observé » sont de vraies sorties.</li>
+<li><b>Quand la doc et la réalité divergent</b>, la réalité observée est indiquée (par exemple pour <code>terraform output</code> d'une valeur sensible).</li>
+</ul></div>
+
+<div class="box astuce"><span class="t">Comment suivre le parcours</span>
+<ul>
+<li>Dans chaque TD, coche « Fait » à chaque étape : ta progression s'affiche ici. Elle reste dans ce navigateur uniquement.</li>
+<li>Fais un TD par partie, dans un dossier à part (<code>td1</code>, <code>td2</code>…) et détruis toujours (<code>terraform destroy</code>) avant de passer à la suite.</li>
+<li>Pas de compte cloud : tout tourne en local (fichiers, noms aléatoires, Docker).</li>
+</ul></div>

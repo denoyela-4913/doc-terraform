@@ -1,0 +1,99 @@
+<!--title:BD Terraform-->
+<div class="kicker">Outil · apprendre en images</div>
+<h1>La BD de Léa et Terra</h1>
+<p class="lead">Léa débute avec Terraform. Terra, son cube violet, lui évite quelques catastrophes. Cinq planches, chacune tirée d'un comportement réel et vérifié dans les parties du parcours.</p>
+<div id="bd"></div>
+<div class="box retenir"><span class="t">Pour aller plus loin</span>
+<p>Chaque planche renvoie à sa partie. Si une scène te parle, refais le TD correspondant : tu verras exactement la même chose dans ton terminal.</p></div>
+
+<script>
+(function () {
+  /* ---------- personnages et accessoires (SVG, coordonnées 400x300) ---------- */
+  function terra(x, y, s, mood) {
+    var eyes = mood === "confused" ? '<circle cx="-14" cy="-22" r="7" fill="#fff"/><circle cx="-12" cy="-22" r="3" fill="#1a1830"/><circle cx="14" cy="-24" r="4" fill="#fff"/><circle cx="14" cy="-24" r="2" fill="#1a1830"/>'
+      : '<circle cx="-14" cy="-22" r="6" fill="#fff"/><circle cx="-13" cy="-21" r="2.6" fill="#1a1830"/><circle cx="14" cy="-22" r="6" fill="#fff"/><circle cx="15" cy="-21" r="2.6" fill="#1a1830"/>';
+    var mouth = mood === "happy" ? '<path d="M-14 -4 Q0 8 14 -4" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round"/>'
+      : mood === "stop" ? '<path d="M-12 -2 L12 -2" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><path d="M-22 -33 L-8 -29 M22 -33 L8 -29" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'
+      : mood === "confused" ? '<path d="M-12 0 Q-4 -6 4 0 T14 -2" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round"/>'
+      : '<ellipse cx="0" cy="-1" rx="6" ry="5" fill="#fff"/>';
+    var arm = mood === "stop" ? '<rect x="38" y="-24" width="30" height="12" rx="6" fill="#3d2a99" transform="rotate(-50 38 -18)"/><circle cx="58" cy="-48" r="9" fill="#8f78ff"/>' : '<rect x="38" y="-6" width="20" height="12" rx="6" fill="#3d2a99"/>';
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><ellipse cx="0" cy="44" rx="50" ry="7" fill="#000" opacity=".12"/>' +
+      '<rect x="-30" y="28" width="22" height="14" rx="5" fill="#3d2a99"/><rect x="8" y="28" width="22" height="14" rx="5" fill="#3d2a99"/>' +
+      '<rect x="-40" y="-52" width="80" height="82" rx="18" fill="#6a4bd8"/><rect x="-32" y="-44" width="64" height="48" rx="12" fill="#8f78ff"/>' +
+      '<rect x="-58" y="-6" width="20" height="12" rx="6" fill="#3d2a99"/>' + arm +
+      '<line x1="0" y1="-52" x2="0" y2="-70" stroke="#3d2a99" stroke-width="4"/><circle cx="0" cy="-74" r="7" fill="#4fd18b"/>' + eyes + mouth + '</g>';
+  }
+  function lea(x, y, s, mood) {
+    var mouth = mood === "oops" ? '<ellipse cx="0" cy="-33" rx="4" ry="5" fill="#8a3b2a"/>'
+      : mood === "sad" ? '<path d="M-7 -30 Q0 -37 7 -30" stroke="#8a3b2a" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
+      : '<path d="M-7 -34 Q0 -27 7 -34" stroke="#8a3b2a" stroke-width="2.6" fill="none" stroke-linecap="round"/>';
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><ellipse cx="0" cy="44" rx="40" ry="6" fill="#000" opacity=".12"/>' +
+      '<rect x="-16" y="22" width="13" height="22" rx="5" fill="#2d3a6b"/><rect x="3" y="22" width="13" height="22" rx="5" fill="#2d3a6b"/>' +
+      '<rect x="-26" y="-18" width="52" height="46" rx="14" fill="#f0b94d"/>' +
+      '<circle cx="0" cy="-44" r="23" fill="#f4c9a0"/><path d="M-24 -46 Q-22 -72 2 -70 Q24 -70 24 -46 Q10 -58 -24 -46Z" fill="#3b2a20"/>' +
+      '<circle cx="-8" cy="-45" r="2.8" fill="#1a1830"/><circle cx="9" cy="-45" r="2.8" fill="#1a1830"/>' + mouth + '</g>';
+  }
+  function laptop(x, y) { return '<g transform="translate(' + x + ' ' + y + ')"><rect x="-44" y="-52" width="88" height="56" rx="6" fill="#2b2742"/><rect x="-38" y="-46" width="76" height="44" rx="3" fill="#15131f"/><text x="-32" y="-30" font-family="monospace" font-size="9" fill="#6fe3a1">$ terraform</text><text x="-32" y="-17" font-family="monospace" font-size="9" fill="#6fe3a1">  apply</text><rect x="-56" y="4" width="112" height="9" rx="4" fill="#4a4566"/></g>'; }
+  function doc(x, y, w, lines, dark) {
+    var h = 20 + lines.length * 17, col = { "+": "#6fe3a1", "~": "#ffd070", "-": "#ff8d8d", "": "#e9e6f7" };
+    var t = lines.map(function (l, i) { var k = /^[+~-]/.test(l) ? l[0] : ""; return '<text x="' + (x + 12) + '" y="' + (y + 26 + i * 17) + '" font-family="monospace" font-size="12.5" style="white-space:pre" fill="' + (dark === false ? "#1a1830" : col[k]) + '">' + l.replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</text>'; }).join("");
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="8" fill="' + (dark === false ? "#fff" : "#15131f") + '" stroke="#1a1830" stroke-width="2.5"/>' + t;
+  }
+  function box(x, y, label, fill, stroke) { return '<rect x="' + x + '" y="' + y + '" width="104" height="46" rx="10" fill="' + fill + '" stroke="' + stroke + '" stroke-width="3"/><text x="' + (x + 52) + '" y="' + (y + 29) + '" text-anchor="middle" font-family="monospace" font-size="14" font-weight="700" fill="#1a1830">' + label + '</text>'; }
+  function trash(x, y) { return '<g transform="translate(' + x + ' ' + y + ')"><path d="M-26 -40 L26 -40 L20 28 L-20 28 Z" fill="#8a8aa6" stroke="#1a1830" stroke-width="2.5"/><rect x="-32" y="-52" width="64" height="12" rx="5" fill="#6b6b88" stroke="#1a1830" stroke-width="2.5"/><path d="M-10 -30 L-8 18 M0 -30 L0 18 M10 -30 L8 18" stroke="#1a1830" stroke-width="2.2"/></g>'; }
+  function cloud(x, y) { return '<g transform="translate(' + x + ' ' + y + ')"><path d="M-70 20 Q-90 20 -86 0 Q-84 -22 -58 -20 Q-52 -48 -20 -46 Q10 -52 22 -26 Q56 -30 62 -4 Q82 2 74 20Z" fill="#fff" stroke="#1a1830" stroke-width="3"/><rect x="-16" y="-14" width="32" height="26" rx="5" fill="#f0b94d" stroke="#1a1830" stroke-width="2.5"/><path d="M-9 -14 L-9 -24 Q0 -34 9 -24 L9 -14" fill="none" stroke="#1a1830" stroke-width="3"/><circle cx="0" cy="0" r="3.5" fill="#1a1830"/></g>'; }
+  function lego(x, y, c) { return '<g transform="translate(' + x + ' ' + y + ')"><rect x="-36" y="-20" width="72" height="34" rx="6" fill="' + c + '" stroke="#1a1830" stroke-width="2.5"/><circle cx="-18" cy="-26" r="8" fill="' + c + '" stroke="#1a1830" stroke-width="2.5"/><circle cx="18" cy="-26" r="8" fill="' + c + '" stroke="#1a1830" stroke-width="2.5"/></g>'; }
+  function x_(x, y) { return '<path d="M' + (x - 14) + ' ' + (y - 14) + ' L' + (x + 14) + ' ' + (y + 14) + ' M' + (x + 14) + ' ' + (y - 14) + ' L' + (x - 14) + ' ' + (y + 14) + '" stroke="#cc3b3b" stroke-width="6" stroke-linecap="round"/>'; }
+  function q_(x, y) { return '<text x="' + x + '" y="' + y + '" font-family="Georgia,serif" font-size="34" font-weight="800" fill="#6a4bd8">?</text>'; }
+
+  /* ---------- planches ---------- */
+  var strips = [
+    { t: "1 · Le plan avant l'action", p: "p1.html", n: "Partie 1", panels: [
+      { cap: "Vendredi, 17 h 58", bg: "#fde9c8", art: lea(105, 205, 1.25, "ok") + laptop(225, 232), b: [{ x: 38, y: 12, w: 56, k: "lea", t: "J'applique direct, et je rentre !" }] },
+      { cap: "Terra intervient", bg: "#e6e0ff", art: lea(85, 215, 1.1, "oops") + terra(285, 195, 1.3, "stop"), b: [{ x: 6, y: 12, w: 52, k: "terra", t: "Stop ! Lis d'abord le plan." }] },
+      { cap: "terraform plan", bg: "#1b1830", art: doc(30, 100, 250, ["+ docker_image.nginx", "~ output.url", "- docker_container.prod"]) + lea(335, 225, 0.9, "oops"), b: [{ x: 8, y: 8, w: 56, k: "lea", t: "Il va DÉTRUIRE la prod ?!" }] },
+      { cap: "Fin de semaine sauvée", bg: "#dff5e7", art: lea(95, 215, 1.1, "ok") + terra(290, 200, 1.25, "happy"), b: [{ x: 28, y: 8, w: 66, k: "terra", t: "Un plan ne change rien : il montre. Puis plan -out, et tu appliques CE plan." }] }
+    ] },
+    { t: "2 · La mémoire de Terraform", p: "p6.html", n: "Partie 6", panels: [
+      { cap: "Le state", bg: "#efe6ff", art: terra(290, 205, 1.3, "happy") + '<rect x="132" y="150" width="76" height="82" rx="6" fill="#fff" stroke="#1a1830" stroke-width="3"/><text x="170" y="182" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#1a1830">tfstate</text><path d="M146 196 L194 196 M146 208 L186 208 M146 220 L190 220" stroke="#8a8aa6" stroke-width="3"/>', b: [{ x: 4, y: 12, w: 58, k: "terra", t: "Mon carnet : qui est quoi dans le monde réel." }] },
+      { cap: "Ménage de printemps", bg: "#fde9c8", art: lea(115, 215, 1.2, "ok") + trash(300, 225) + '<rect x="215" y="120" width="50" height="62" rx="5" fill="#fff" stroke="#1a1830" stroke-width="3" transform="rotate(14 240 150)"/>', b: [{ x: 38, y: 10, w: 58, k: "lea", t: "Ce vieux terraform.tfstate ? Poubelle !" }] },
+      { cap: "terraform plan", bg: "#e8eef7", art: terra(120, 205, 1.3, "confused") + q_(40, 90) + q_(190, 78) + doc(215, 150, 160, ["Plan: 2 to add,", "0 to change,", "0 to destroy."], false), b: [{ x: 52, y: 8, w: 46, k: "terra", t: "Je ne les connais plus… je les recrée !" }] },
+      { cap: "La bonne pratique", bg: "#dff5e7", art: cloud(115, 150) + terra(300, 205, 1.3, "happy"), b: [{ x: 4, y: 52, w: 52, k: "terra", t: "State distant, chiffré, verrouillé, et jamais dans Git." }] }
+    ] },
+    { t: "3 · count ou for_each ?", p: "p5.html", n: "Partie 5", panels: [
+      { cap: "Trois amis dans une liste", bg: "#fde9c8", art: box(20, 150, "[0] alice", "#fff", "#1a1830") + box(148, 150, "[1] bob", "#fff", "#1a1830") + box(276, 150, "[2] chloe", "#fff", "#1a1830") + lea(70, 270, 0.5, "ok"), b: [{ x: 22, y: 14, w: 56, k: "lea", t: "On retire bob de la liste." }] },
+      { cap: "Avec count", bg: "#fbe5e5", art: box(20, 150, "[0] alice", "#e3f5ea", "#178a4b") + box(148, 150, "[1] chloe", "#f3e4fa", "#9b32c8") + box(276, 150, "[2] ???", "#fbe5e5", "#cc3b3b") + x_(362, 173) + '<text x="200" y="138" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="#9b32c8">remplacé</text>' + terra(335, 262, 0.55, "happy"), b: [{ x: 6, y: 12, w: 80, k: "terra", t: "Bob parti : chloe prend sa place, la 3e est détruite !" }] },
+      { cap: "Avec for_each", bg: "#dff5e7", art: box(20, 150, '["alice"]', "#e3f5ea", "#178a4b") + box(148, 150, '["bob"]', "#fbe5e5", "#cc3b3b") + x_(236, 173) + box(276, 150, '["chloe"]', "#e3f5ea", "#178a4b") + terra(335, 262, 0.55, "happy"), b: [{ x: 6, y: 12, w: 80, k: "terra", t: "Chacun garde son nom. Seul bob disparaît." }] },
+      { cap: "La règle", bg: "#efe6ff", art: lea(95, 215, 1.1, "ok") + terra(290, 200, 1.25, "happy"), b: [{ x: 6, y: 8, w: 46, k: "lea", t: "Valeurs distinctes ? for_each !" }, { x: 54, y: 8, w: 44, k: "terra", t: "Instances presque identiques ? count." }] }
+    ] },
+    { t: "4 · Les modules, c'est des légos", p: "p7.html", n: "Partie 7", panels: [
+      { cap: "Copier-coller x5", bg: "#fde9c8", art: lea(105, 215, 1.2, "sad") + '<g>' + [0, 1, 2, 3, 4].map(function (i) { return '<rect x="' + (210 + i * 12) + '" y="' + (120 + i * 12) + '" width="110" height="70" rx="6" fill="#fff" stroke="#1a1830" stroke-width="2.5"/>'; }).join("") + '<path d="M232 190 L300 190 M232 202 L286 202" stroke="#8a8aa6" stroke-width="3"/></g>', b: [{ x: 6, y: 8, w: 56, k: "lea", t: "Encore le même bloc… je copie." }] },
+      { cap: "Terra propose", bg: "#e6e0ff", art: terra(110, 205, 1.3, "happy") + lego(280, 170, "#9b7bff") + lego(280, 140, "#4fd18b"), b: [{ x: 36, y: 8, w: 62, k: "terra", t: "Fais-en un module : variables en entrée, outputs en sortie." }] },
+      { cap: "module.alice · module.bob", bg: "#1b1830", art: doc(36, 92, 328, ['module "alice" {', '  source = "./modules/salutation"', '  nom    = "Alice"', "}"]) + lea(340, 262, 0.62, "ok"), b: [{ x: 6, y: 67, w: 50, k: "lea", t: "Un module, appelé deux fois !" }] },
+      { cap: "Refactorer sans casse", bg: "#dff5e7", art: doc(30, 90, 250, ["moved {", "  from = module.alice", '  to   = module.equipe["alice"]', "}"]) + terra(330, 215, 1.0, "happy"), b: [{ x: 30, y: 8, w: 66, k: "terra", t: "Avec moved, rien n'est détruit : « 0 to destroy »." }] }
+    ] },
+    { t: "5 · Sensitive n'est pas un coffre-fort", p: "p4.html", n: "Parties 4 et 8", panels: [
+      { cap: "sensitive = true", bg: "#fde9c8", art: doc(30, 110, 230, ['variable "mot_de_passe" {', "  sensitive = true", "}"]) + lea(320, 215, 1.1, "ok"), b: [{ x: 4, y: 8, w: 58, k: "lea", t: "Je l'ai marqué sensitive : c'est secret !" }] },
+      { cap: "Dans le terminal", bg: "#1b1830", art: doc(30, 100, 300, ["  content = (sensitive value)", "secret_affiche = <sensitive>"]) + lea(350, 235, 0.8, "ok"), b: [{ x: 8, y: 8, w: 50, k: "lea", t: "Tu vois ? Masqué !" }] },
+      { cap: "Dans terraform.tfstate", bg: "#fbe5e5", art: doc(16, 100, 290, ['"secret_affiche": {', '  "value": "abc123",', '  "sensitive": true', '}'], true) + '<rect x="107" y="130" width="68" height="18" fill="none" stroke="#ff4d4d" stroke-width="3" rx="4"/>' + terra(330, 215, 1.0, "confused"), b: [{ x: 6, y: 10, w: 62, k: "terra", t: "Regarde le state : c'est en clair." }] },
+      { cap: "Que faire ?", bg: "#dff5e7", art: cloud(95, 160) + terra(300, 205, 1.3, "happy"), b: [{ x: 4, y: 68, w: 54, k: "terra", t: "State chiffré, accès limités et journalisés, valeurs éphémères." }] }
+    ] }
+  ];
+
+  var root = document.getElementById("bd");
+  strips.forEach(function (s) {
+    var h = document.createElement("section");
+    h.innerHTML = '<h2>' + s.t + '</h2><p class="src">Voir : <a href="' + s.p + '">' + s.n + '</a></p><div class="strip"></div>';
+    var grid = h.querySelector(".strip");
+    s.panels.forEach(function (p) {
+      var d = document.createElement("div"); d.className = "pn";
+      d.innerHTML = '<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="300" fill="' + p.bg + '"/>' + p.art + '</svg><div class="cap">' + p.cap + '</div>' +
+        p.b.map(function (b) { return '<div class="bub ' + b.k + '" style="left:' + b.x + '%;top:' + b.y + '%;max-width:' + (b.w || 60) + '%">' + b.t.replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</div>'; }).join("");
+      d.setAttribute("role", "img");
+      d.setAttribute("aria-label", p.cap + " : " + p.b.map(function (b) { return b.t; }).join(" / "));
+      grid.appendChild(d);
+    });
+    root.appendChild(h);
+  });
+})();
+</script>

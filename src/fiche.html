@@ -1,0 +1,229 @@
+<!--title:Fiche de référence Terraform-->
+<div class="kicker">Outil · référence rapide</div>
+<h1>Fiche de référence</h1>
+<p class="lead">Tout ce qui est utile sous la main. Chaque entrée vient de la documentation officielle (v1.17.x) ou d'une exécution réelle.</p>
+
+<div class="cs">
+
+<section>
+<h2>Cycle de vie des commandes</h2>
+<dl>
+<dt>terraform init</dt><dd>backend + modules + providers. Sans danger à relancer</dd>
+<dt>init -upgrade</dt><dd>monte modules et plugins au plus récent autorisé</dd>
+<dt>init -reconfigure</dt><dd>ignore le backend existant, sans migration</dd>
+<dt>init -migrate-state</dt><dd>copie le state vers le nouveau backend</dd>
+<dt>init -backend=false</dt><dd>saute le backend</dd>
+<dt>terraform fmt</dt><dd>formate (-recursive, -check, -diff)</dd>
+<dt>terraform validate</dt><dd>syntaxe + cohérence interne</dd>
+<dt>terraform plan</dt><dd>compare et propose, ne change rien</dd>
+<dt>terraform apply</dt><dd>exécute (confirmation, ou fichier de plan)</dd>
+<dt>terraform destroy</dt><dd>détruit tout le workspace courant</dd>
+</dl>
+</section>
+
+<section>
+<h2>Options de plan et d'apply</h2>
+<dl>
+<dt>-out=FICHIER</dt><dd>sauve le plan</dd>
+<dt>apply FICHIER</dt><dd>applique ce plan, sans confirmation</dd>
+<dt>-var 'k=v'</dt><dd>une variable</dd>
+<dt>-var-file=F</dt><dd>un fichier .tfvars</dd>
+<dt>-destroy</dt><dd>plan de destruction totale</dd>
+<dt>-refresh-only</dt><dd>aligne le state sur le réel</dd>
+<dt>-refresh=false</dt><dd>sans synchroniser le state</dd>
+<dt>-replace=ADR</dt><dd>force le remplacement d'une instance</dd>
+<dt>-target=ADR</dt><dd>exceptionnel seulement</dd>
+<dt>-detailed-exitcode</dt><dd>0 rien · 1 erreur · 2 changements</dd>
+<dt>-auto-approve</dt><dd>saute la confirmation (apply)</dd>
+<dt>-parallelism=n</dt><dd>10 par défaut</dd>
+<dt>-lock=false</dt><dd>dangereux</dd>
+<dt>-lock-timeout=3s</dt><dd>attend le verrou</dd>
+</dl>
+</section>
+
+<section>
+<h2>Symboles du plan</h2>
+<dl>
+<dt style="color:var(--add)">+</dt><dd>créer</dd>
+<dt style="color:var(--change)">~</dt><dd>modifier en place</dd>
+<dt style="color:var(--destroy)">-</dt><dd>détruire</dd>
+<dt style="color:var(--replace)">-/+</dt><dd>remplacer (# forces replacement)</dd>
+<dt>(known after apply)</dt><dd>valeur calculée pendant l'apply</dd>
+<dt>has moved to</dt><dd>un bloc moved s'applique</dd>
+<dt>will be read during apply</dt><dd>data source différée</dd>
+</dl>
+</section>
+
+<section>
+<h2>Blocs de premier niveau</h2>
+<dl>
+<dt>terraform { }</dt><dd>required_version, required_providers, backend</dd>
+<dt>provider "x" { }</dt><dd>configure un provider</dd>
+<dt>resource "t" "n" { }</dt><dd>objet géré : t.n</dd>
+<dt>data "t" "n" { }</dt><dd>lecture seule : data.t.n</dd>
+<dt>variable "n" { }</dt><dd>entrée : var.n</dd>
+<dt>locals { }</dt><dd>calculs : local.n</dd>
+<dt>output "n" { }</dt><dd>sortie</dd>
+<dt>module "n" { }</dt><dd>appel : module.n.sortie</dd>
+<dt>moved { } · import { }</dt><dd>refactoring · adoption</dd>
+</dl>
+</section>
+
+<section>
+<h2>Types</h2>
+<dl>
+<dt>string number bool</dt><dd>primitifs</dd>
+<dt>list(T) tuple</dt><dd>séquence indexée dès 0</dd>
+<dt>set(T)</dt><dd>unique, sans ordre, pas d'index</dd>
+<dt>map(T) object</dt><dd>clé/valeur</dd>
+<dt>null</dt><dd>absence : argument traité comme omis</dd>
+<dt>tolist tomap toset tostring</dt><dd>conversions explicites</dd>
+</dl>
+</section>
+
+<section>
+<h2>Références</h2>
+<dl>
+<dt>var.x · local.x</dt><dd>variable · local</dd>
+<dt>type.nom.attr</dt><dd>attribut d'une ressource</dd>
+<dt>data.type.nom.attr</dt><dd>attribut d'une data source</dd>
+<dt>module.nom.sortie</dt><dd>sortie d'un module</dd>
+<dt>path.module · root · cwd</dt><dd>dossiers courants</dd>
+<dt>terraform.workspace</dt><dd>workspace courant</dd>
+<dt>count.index</dt><dd>indice (count)</dd>
+<dt>each.key · each.value</dt><dd>clé · valeur (for_each)</dd>
+<dt>self</dt><dd>ressource courante (provisioner)</dd>
+</dl>
+</section>
+
+<section>
+<h2>Expressions</h2>
+<dl>
+<dt>a ? b : c</dt><dd>condition (b et c même type)</dd>
+<dt>[for s in L : upper(s)]</dt><dd>liste</dd>
+<dt>{for s in L : s =&gt; upper(s)}</dt><dd>objet</dd>
+<dt>... if cond</dt><dd>filtre</dd>
+<dt>k =&gt; v...</dt><dd>regroupe les clés en double</dd>
+<dt>"${var.x}"</dt><dd>interpolation</dd>
+</dl>
+</section>
+
+<section>
+<h2>Méta-arguments</h2>
+<dl>
+<dt>count = n</dt><dd>n instances · count.index</dd>
+<dt>for_each = map|set</dt><dd>une par clé · each.key/value</dd>
+<dt>depends_on = [ ]</dt><dd>dépendance cachée, dernier recours</dd>
+<dt>provider = alias</dt><dd>autre configuration de provider</dd>
+<dt>lifecycle { }</dt><dd>voir ci-dessous</dd>
+</dl>
+</section>
+
+<section>
+<h2>lifecycle</h2>
+<dl>
+<dt>prevent_destroy</dt><dd>rejette les plans destructeurs</dd>
+<dt>create_before_destroy</dt><dd>crée avant de détruire</dd>
+<dt>ignore_changes = [ ]</dt><dd>ignore des attributs</dd>
+<dt>replace_triggered_by</dt><dd>remplace si la cible change</dd>
+<dt>precondition / postcondition</dt><dd>condition + error_message</dd>
+</dl>
+</section>
+
+<section>
+<h2>Contraintes de version</h2>
+<dl>
+<dt>= (ou rien)</dt><dd>version exacte</dd>
+<dt>!=</dt><dd>exclut une version</dd>
+<dt>&gt; &gt;= &lt; &lt;=</dt><dd>bornes</dd>
+<dt>~&gt; 1.0.4</dt><dd>1.0.x à partir de 1.0.4, pas 1.1</dd>
+<dt>~&gt; 1.1</dt><dd>1.x à partir de 1.1, pas 2.0</dd>
+<dt>"&gt;= 1.2.0, &lt; 2.0.0"</dt><dd>conditions combinées</dd>
+</dl>
+</section>
+
+<section>
+<h2>Précédence des variables</h2>
+<dl>
+<dt>1</dt><dd>-var / -var-file (+ HCP Terraform)</dd>
+<dt>2</dt><dd>*.auto.tfvars (ordre lexical)</dd>
+<dt>3</dt><dd>terraform.tfvars.json</dd>
+<dt>4</dt><dd>terraform.tfvars</dd>
+<dt>5</dt><dd>TF_VAR_nom</dd>
+<dt>6</dt><dd>default</dd>
+</dl>
+</section>
+
+<section>
+<h2>State, workspaces</h2>
+<dl>
+<dt>state list / show</dt><dd>lister · détailler</dd>
+<dt>state mv / rm</dt><dd>renommer · oublier</dd>
+<dt>state pull</dt><dd>affiche le state</dd>
+<dt>output [-raw|-json]</dt><dd>sorties (voir pièges !)</dd>
+<dt>show [-json]</dt><dd>state ou plan lisible</dd>
+<dt>workspace list new select delete</dt><dd>gère les workspaces</dd>
+<dt>graph</dt><dd>graphe DOT · | dot -Tpng</dd>
+<dt>console</dt><dd>évalue des expressions</dd>
+</dl>
+</section>
+
+<section>
+<h2>Tests et qualité</h2>
+<dl>
+<dt>fmt -check</dt><dd>0 si bien formaté, sinon non nul</dd>
+<dt>validate</dt><dd>sans services distants</dd>
+<dt>test</dt><dd>fichiers .tftest.hcl</dd>
+<dt>run "nom" { command = plan }</dt><dd>sans créer d'infra</dd>
+<dt>assert { condition ... }</dt><dd>+ error_message</dd>
+</dl>
+</section>
+
+<section>
+<h2>Variables d'environnement</h2>
+<dl>
+<dt>TF_VAR_nom</dt><dd>valeur de variable</dd>
+<dt>TF_LOG</dt><dd>TRACE DEBUG INFO WARN ERROR</dd>
+<dt>TF_LOG_PATH</dt><dd>fichier (TF_LOG requis)</dd>
+<dt>TF_INPUT=false</dt><dd>jamais de saisie</dd>
+<dt>TF_IN_AUTOMATION</dt><dd>sortie sans suggestions</dd>
+<dt>TF_CLI_ARGS</dt><dd>arguments ajoutés aux commandes</dd>
+<dt>TF_DATA_DIR</dt><dd>autre emplacement de .terraform</dd>
+<dt>TF_WORKSPACE</dt><dd>choisit le workspace</dd>
+<dt>TF_PLUGIN_CACHE_DIR</dt><dd>cache des providers</dd>
+</dl>
+</section>
+
+<section>
+<h2>Fichiers d'un projet</h2>
+<dl>
+<dt>terraform.tf</dt><dd>versions et providers requis</dd>
+<dt>providers.tf</dt><dd>blocs provider</dd>
+<dt>backend.tf</dt><dd>backend</dd>
+<dt>main.tf</dt><dd>ressources et data</dd>
+<dt>variables.tf · outputs.tf</dt><dd>alphabétique</dd>
+<dt>locals.tf</dt><dd>locals partagés</dd>
+<dt>.terraform.lock.hcl</dt><dd>à committer</dd>
+<dt>terraform.tfstate</dt><dd>à ne pas committer</dd>
+<dt>.terraform/</dt><dd>providers téléchargés</dd>
+</dl>
+</section>
+
+<section>
+<h2>Fonctions par famille</h2>
+<dl>
+<dt>Chaînes</dt><dd>chomp join lower upper</dd>
+<dt>Collections</dt><dd>compact concat flatten keys</dd>
+<dt>Numérique</dt><dd>ceil floor max min</dd>
+<dt>Encodage</dt><dd>base64encode jsondecode jsonencode yamlencode</dd>
+<dt>Fichiers</dt><dd>abspath basename file templatefile</dd>
+<dt>Date/heure</dt><dd>formatdate timeadd timecmp timestamp</dd>
+<dt>Hash/crypto</dt><dd>md5 sha256 uuid bcrypt</dd>
+<dt>Réseau IP</dt><dd>cidrhost cidrnetmask cidrsubnet cidrsubnets</dd>
+<dt>Conversion</dt><dd>can tolist tomap try</dd>
+</dl>
+</section>
+
+</div>
+
+<div class="box astuce"><span class="t">Astuce</span><p>Une fonction ou une expression te résiste ? Teste-la en direct dans <code>terraform console</code> avant de la mettre dans ton code.</p></div>

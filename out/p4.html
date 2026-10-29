@@ -1,0 +1,210 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="claude:viewport-fit-sides" content="cover"><title>Partie 4 · Variables, locals, outputs</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"><link rel="stylesheet" href="style.css"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body data-part="4"><header class="top"><div class="top-in"><a class="brand" href="index.html"><i><b></b><b></b><b></b><b></b></i>Terraform en un jour</a><nav class="nav" aria-label="Navigation"><a href="index.html">Accueil</a><a href="p1.html">1 · Le déclic</a><a href="p2.html">2 · Parler HCL</a><a href="p3.html">3 · Providers</a><a href="p4.html" aria-current="page">4 · Variables</a><a href="p5.html">5 · Boucles</a><a href="p6.html">6 · State</a><a href="p7.html">7 · Modules</a><a href="p8.html">8 · Pro</a><a href="flashcards.html">Flashcards</a><a href="mindmap.html">Mindmap</a><a href="fiche.html">Fiche</a><a href="bd.html">BD</a><a href="pieges.html">Pièges</a><a href="quiz.html">Quiz final</a><a href="sources.html">Sources</a></nav><button class="theme" type="button">Thème</button></div></header><main class="wrap" id="main"><div class="kicker">Partie 4 sur 8 · 13:30 – 14:20</div>
+<h1>Variables, locals, outputs</h1>
+<p class="lead">Une configuration utile se <b>paramètre</b>. Les variables entrent, les locals calculent, les outputs sortent. Et chaque valeur a une source, avec un ordre de priorité à connaître.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Déclarer des variables typées, documentées et validées.</li>
+<li>Prédire quelle valeur gagne quand plusieurs sources existent.</li>
+<li>Utiliser <code>locals</code> à bon escient et lire/protéger des <code>output</code>.</li>
+</ul></div>
+
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 220" role="img" aria-label="Entrées, calculs et sorties d'un module">
+  <defs><marker id="a4" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="bx2" x="10" y="20" width="780" height="180" rx="18"/>
+  <text x="400" y="44" text-anchor="middle" class="mut b" font-size="13">UN MODULE</text>
+  <rect class="c-acc" x="40" y="70" width="170" height="90" rx="14"/>
+  <text x="125" y="104" text-anchor="middle" class="b m t-acc" font-size="15">variable</text>
+  <text x="125" y="128" text-anchor="middle" font-size="13">entrée : var.nom</text>
+  <rect class="c-chg" x="315" y="70" width="170" height="90" rx="14"/>
+  <text x="400" y="104" text-anchor="middle" class="b m t-chg" font-size="15">locals</text>
+  <text x="400" y="128" text-anchor="middle" font-size="13">calcul : local.prefixe</text>
+  <rect class="c-add" x="590" y="70" width="170" height="90" rx="14"/>
+  <text x="675" y="104" text-anchor="middle" class="b m t-add" font-size="15">output</text>
+  <text x="675" y="128" text-anchor="middle" font-size="13">sortie : module.x.sortie</text>
+  <path class="ln" d="M210 115 L311 115" marker-end="url(#a4)"/>
+  <path class="ln" d="M485 115 L586 115" marker-end="url(#a4)"/>
+</svg></div>
+<figcaption>Variable = paramètre d'entrée · local = valeur calculée interne · output = valeur exposée.</figcaption>
+</figure>
+
+<h2>4.1 Déclarer une variable</h2>
+<pre class="code" data-l="hcl" data-file="variables.tf">
+variable "environnement" {
+  type        = string
+  description = "Environnement cible"
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environnement)
+    error_message = "L'environnement doit etre dev, staging ou prod."
+  }
+}
+</pre>
+<div class="tbl"><table>
+<tr><th>Argument</th><th>Rôle</th></tr>
+<tr><td><code>type</code></td><td>le type attendu (<code>string</code>, <code>number</code>, <code>list(string)</code>, <code>map(object({…}))</code>…)</td></tr>
+<tr><td><code>default</code></td><td>valeur de secours. Sans <code>default</code>, Terraform demande la valeur avant le plan</td></tr>
+<tr><td><code>description</code></td><td>explique la variable aux utilisateurs du module</td></tr>
+<tr><td><code>validation</code></td><td>un bloc avec <code>condition</code> et <code>error_message</code></td></tr>
+<tr><td><code>sensitive</code></td><td>masque la valeur dans la sortie CLI (mais elle reste dans le state !)</td></tr>
+<tr><td><code>nullable</code> · <code>ephemeral</code></td><td><code>ephemeral</code> : la valeur n'est écrite ni dans le state ni dans le plan</td></tr>
+</table></div>
+
+<h2>4.2 Qui gagne ? La précédence des valeurs</h2>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 330" role="img" aria-label="Escalier de précédence des sources de valeurs, de la plus forte à la plus faible">
+  <g font-size="14">
+    <rect class="c-rep" x="20" y="14" width="760" height="40" rx="10"/><text x="36" y="40" class="b t-rep">1</text><text x="62" y="40" class="m">-var  /  -var-file</text><text x="770" y="40" text-anchor="end" class="mut">+ variables HCP Terraform · le plus fort</text>
+    <rect class="c-chg" x="60" y="62" width="720" height="40" rx="10"/><text x="76" y="88" class="b t-chg">2</text><text x="102" y="88" class="m">*.auto.tfvars  (ordre lexical)</text>
+    <rect class="c-chg" x="100" y="110" width="680" height="40" rx="10"/><text x="116" y="136" class="b t-chg">3</text><text x="142" y="136" class="m">terraform.tfvars.json</text>
+    <rect class="c-add" x="140" y="158" width="640" height="40" rx="10"/><text x="156" y="184" class="b t-add">4</text><text x="182" y="184" class="m">terraform.tfvars</text>
+    <rect class="c-add" x="180" y="206" width="600" height="40" rx="10"/><text x="196" y="232" class="b t-add">5</text><text x="222" y="232" class="m">variables d'environnement  TF_VAR_nom</text>
+    <rect class="bx" x="220" y="254" width="560" height="40" rx="10"/><text x="236" y="280" class="b">6</text><text x="262" y="280" class="m">default  (dans le bloc variable)</text><text x="770" y="280" text-anchor="end" class="mut">le plus faible</text>
+  </g>
+</svg></div>
+<figcaption>Du plus prioritaire (en haut) au moins prioritaire (en bas). Source : doc officielle, « Input Variables ».</figcaption>
+</figure>
+
+<h2>4.3 Locals : nommer un calcul</h2>
+<pre class="code" data-l="hcl">
+locals {
+  prefixe  = "app-${var.environnement}"
+  est_prod = var.environnement == "prod"
+}
+# se lit avec le mot SINGULIER :  local.prefixe
+</pre>
+<p>La doc les recommande quand tu <b>réutilises</b> une valeur à plusieurs endroits ou quand l'expression est <b>complexe</b>. Elle prévient aussi : les locals « peuvent rendre la configuration plus difficile à lire car ils masquent l'origine des valeurs ». Ils ne sont visibles que dans leur module.</p>
+
+<h2>4.4 Outputs : exposer des valeurs</h2>
+<pre class="code" data-l="hcl">
+output "prefixe" {
+  description = "Prefixe calcule"
+  value       = local.prefixe
+}
+
+output "secret_affiche" {
+  value     = var.mot_de_passe
+  sensitive = true
+}
+</pre>
+<p>Après un <code>apply</code>, les sorties du module racine s'affichent. Un module parent lit celles d'un module enfant avec <code>module.NOM.SORTIE</code>.</p>
+<div class="box danger"><span class="t">Sensitive ≠ secret protégé</span>
+<ul>
+<li><code>sensitive = true</code> masque la valeur dans la sortie CLI : <code>(sensitive value)</code> dans le plan, <code>&lt;sensitive&gt;</code> avec <code>terraform output</code>.</li>
+<li>Mais la valeur reste <b>dans le state et les fichiers de plan</b> : « quiconque y accède accède à tes valeurs sensibles ».</li>
+<li>Observé en 1.17.0 : <code>terraform output secret_affiche</code>, <code>-raw</code> et <code>-json</code> l'affichent <b>en clair</b>.</li>
+</ul><p class="src">developer.hashicorp.com/terraform/language/manage-sensitive-data</p></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 4</span><h3>Valider, prioriser, masquer</h3><span class="dur">≈ 25 min · aucun compte cloud</span></div>
+<ol class="steps">
+<li><b>Écris la configuration.</b> Dans un dossier <code>td4</code> :
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+variable "environnement" {
+  type        = string
+  description = "Environnement cible"
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environnement)
+    error_message = "L'environnement doit etre dev, staging ou prod."
+  }
+}
+
+variable "mot_de_passe" {
+  type        = string
+  description = "Un secret de demonstration"
+  default     = "abc123"
+  sensitive   = true
+}
+
+locals {
+  prefixe  = "app-${var.environnement}"
+  est_prod = var.environnement == "prod"
+}
+
+resource "local_file" "conf" {
+  filename = "${path.module}/${local.prefixe}.conf"
+  content  = "mode=${local.est_prod ? "strict" : "souple"}\nsecret=${var.mot_de_passe}\n"
+}
+
+output "prefixe" {
+  description = "Prefixe calcule"
+  value       = local.prefixe
+}
+
+output "secret_affiche" {
+  description = "Le secret (masque)"
+  value       = var.mot_de_passe
+  sensitive   = true
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+</pre></li>
+<li><b>Déclenche la validation.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -var environnement=test
+</pre>
+<pre class="code" data-l="out" data-file="résultat">
+Error: Invalid value for variable
+
+  on main.tf line 10:
+  10: variable "environnement" {
+    │ var.environnement is "test"
+
+L'environnement doit etre dev, staging ou prod.
+</pre>
+<p class="expect">Ton <code>error_message</code> s'affiche tel quel. Puis applique avec les valeurs par défaut : <code>terraform apply -auto-approve</code>. Le fichier <code>app-dev.conf</code> apparaît.</p></li>
+<li><b>Joue avec la précédence.</b> Observe la sortie <code>prefixe</code> après chaque apply.
+<pre class="code" data-l="sh">
+$ TF_VAR_environnement=staging terraform apply -auto-approve   # env > default
+$ echo 'environnement = "prod"' &gt; terraform.tfvars
+$ TF_VAR_environnement=staging terraform apply -auto-approve   # tfvars > env
+$ TF_VAR_environnement=staging terraform apply -auto-approve -var environnement=dev   # -var > tout
+</pre>
+<pre class="code" data-l="out" data-file="la sortie prefixe, observée">
+prefixe = "app-staging"
+prefixe = "app-prod"
+prefixe = "app-dev"
+</pre>
+<p class="expect">Tu viens de vérifier l'escalier : <code>-var</code> &gt; <code>terraform.tfvars</code> &gt; <code>TF_VAR_</code> &gt; <code>default</code>.</p></li>
+<li><b>Découvre ce que « sensitive » masque vraiment.</b>
+<pre class="code" data-l="sh">
+$ terraform output
+$ terraform output secret_affiche
+$ grep -c abc123 terraform.tfstate
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+prefixe = "app-dev"
+secret_affiche = &lt;sensitive&gt;
+"abc123"
+1
+</pre>
+<p class="expect">Masqué dans la liste, lisible par nom, et présent dans le state. Garde ce réflexe pour la partie 8.</p></li>
+<li><b>Mesure l'effet d'un secret dans un plan.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -var mot_de_passe=autre
+</pre>
+<p class="expect">Cherche <code>content = (sensitive value) # forces replacement</code> : le contenu du fichier est masqué, mais Terraform sait qu'il change. Nettoie : <code>rm terraform.tfvars &amp;&amp; terraform destroy -auto-approve</code>.</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<p>Ajoute dans <code>main.tf</code> une variable <code>port</code> de type <code>number</code> avec une validation <code>var.port &gt;= 1024 &amp;&amp; var.port &lt;= 65535</code>, puis teste <code>-var port=80</code>.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 4</h2>
+<div class="quiz" data-p="4"></div>
+<nav class="pager" aria-label="Parties"><a href="p3.html"><small>← Partie précédente</small>3 · Providers</a><a class="next" href="p5.html"><small>Partie suivante →</small>5 · Boucles</a></nav></main><footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer><script src="data.js"></script><script src="app.js"></script></body></html>

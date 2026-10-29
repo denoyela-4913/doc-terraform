@@ -1,0 +1,170 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="claude:viewport-fit-sides" content="cover"><title>Partie 2 · Parler HCL</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"><link rel="stylesheet" href="style.css"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body data-part="2"><header class="top"><div class="top-in"><a class="brand" href="index.html"><i><b></b><b></b><b></b><b></b></i>Terraform en un jour</a><nav class="nav" aria-label="Navigation"><a href="index.html">Accueil</a><a href="p1.html">1 · Le déclic</a><a href="p2.html" aria-current="page">2 · Parler HCL</a><a href="p3.html">3 · Providers</a><a href="p4.html">4 · Variables</a><a href="p5.html">5 · Boucles</a><a href="p6.html">6 · State</a><a href="p7.html">7 · Modules</a><a href="p8.html">8 · Pro</a><a href="flashcards.html">Flashcards</a><a href="mindmap.html">Mindmap</a><a href="fiche.html">Fiche</a><a href="bd.html">BD</a><a href="pieges.html">Pièges</a><a href="quiz.html">Quiz final</a><a href="sources.html">Sources</a></nav><button class="theme" type="button">Thème</button></div></header><main class="wrap" id="main"><div class="kicker">Partie 2 sur 8 · 10:05 – 10:55</div>
+<h1>Parler HCL</h1>
+<p class="lead">HCL est le langage des fichiers <code>.tf</code>. Peu de règles de syntaxe, mais un vocabulaire d'expressions à connaître : types, références, conditions, boucles <code>for</code>, fonctions.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Distinguer arguments et blocs, et respecter les règles d'identifiants et de commentaires.</li>
+<li>Manipuler les types (<code>string</code>, <code>list</code>, <code>map</code>…) et les convertir.</li>
+<li>Utiliser références, conditions, expressions <code>for</code> et fonctions, et les tester dans <code>terraform console</code>.</li>
+</ul></div>
+
+<h2>2.1 Arguments et blocs</h2>
+<pre class="code" data-l="hcl" data-file="syntaxe.tf">
+# Un ARGUMENT : un nom, un "=", une valeur
+image_id = "abc123"
+
+# Un BLOC : un type, des labels, un corps entre accolades
+resource "aws_instance" "example" {
+  ami = "abc123"          # argument dans le bloc
+
+  network_interface {     # bloc imbriqué
+    # ...
+  }
+}
+</pre>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 270" role="img" aria-label="Anatomie d'un bloc HCL : type, labels, argument, bloc imbriqué">
+  <rect x="20" y="20" width="470" height="236" rx="14" style="fill:#15131f"/>
+  <g class="m" font-size="16">
+    <text x="40" y="58" style="fill:#b6a8ff">resource</text>
+    <text x="126.4" y="58" style="fill:#8fe0b0">"aws_instance"</text>
+    <text x="270.4" y="58" style="fill:#8fe0b0">"example"</text>
+    <text x="366.4" y="58" style="fill:#e9e6f7">{</text>
+    <text x="64" y="104" style="fill:#e9e6f7">ami = </text><text x="121.6" y="104" style="fill:#8fe0b0">"abc123"</text>
+    <text x="64" y="150" style="fill:#e9e6f7">network_interface {</text>
+    <text x="88" y="178" style="fill:#8f8bab"># ...</text>
+    <text x="64" y="206" style="fill:#e9e6f7">}</text>
+    <text x="40" y="238" style="fill:#e9e6f7">}</text>
+  </g>
+  <rect x="40" y="64" width="76.8" height="3.5" rx="2" style="fill:#b6a8ff"/>
+  <rect x="126.4" y="64" width="230.4" height="3.5" rx="2" style="fill:#6fe3a1"/>
+  <rect x="64" y="110" width="134.4" height="3.5" rx="2" style="fill:#ffd070"/>
+  <rect x="64" y="156" width="163.2" height="3.5" rx="2" style="fill:#e3a2ff"/>
+  <g font-size="14.5">
+    <rect x="530" y="46" width="14" height="14" rx="3" style="fill:#b6a8ff"/><text x="554" y="58" class="b">TYPE du bloc</text>
+    <rect x="530" y="92" width="14" height="14" rx="3" style="fill:#6fe3a1"/><text x="554" y="104" class="b">LABELS</text><text x="554" y="124" class="mut" font-size="13">type de ressource, puis nom local</text>
+    <rect x="530" y="148" width="14" height="14" rx="3" style="fill:#ffd070"/><text x="554" y="160" class="b">ARGUMENT</text><text x="554" y="180" class="mut" font-size="13">nom = valeur</text>
+    <rect x="530" y="196" width="14" height="14" rx="3" style="fill:#e3a2ff"/><text x="554" y="208" class="b">BLOC IMBRIQUÉ</text><text x="554" y="228" class="mut" font-size="13">même forme, à l'intérieur du corps { }</text>
+  </g>
+</svg></div>
+<figcaption>Un bloc a un type, des labels éventuels, et un corps contenant arguments et blocs imbriqués.</figcaption>
+</figure>
+
+<div class="box doc"><span class="t">Règles de la doc</span>
+<ul>
+<li><b>Identifiants</b> : lettres, chiffres, <code>_</code> et <code>-</code> ; le premier caractère ne peut pas être un chiffre.</li>
+<li><b>Commentaires</b> : <code>#</code> est le style par défaut. <code>//</code> et <code>/* … */</code> existent mais ne sont pas idiomatiques.</li>
+<li><b>Encodage</b> : UTF-8 obligatoire ; fins de ligne LF ou CRLF acceptées (LF est idiomatique).</li>
+<li><b>Fichiers</b> : tous les <code>.tf</code> d'un répertoire forment un seul document. Les séparer n'a aucun effet sur le comportement, seulement sur la lisibilité. Un sous-dossier est un autre module.</li>
+</ul><p class="src">developer.hashicorp.com/terraform/language/syntax/configuration · /language/files</p></div>
+
+<h2>2.2 Les types</h2>
+<div class="tbl"><table>
+<tr><th>Famille</th><th>Types</th><th>Exemple</th></tr>
+<tr><td>Primitifs</td><td><code>string</code>, <code>number</code>, <code>bool</code></td><td><code>"hello"</code> · <code>15</code> · <code>true</code></td></tr>
+<tr><td>Séquence</td><td><code>list</code> / <code>tuple</code></td><td><code>["us-west-1a", "us-west-1c"]</code> (indexée à partir de 0)</td></tr>
+<tr><td>Ensemble</td><td><code>set</code></td><td>valeurs uniques, sans ordre, <b>pas d'accès par index</b></td></tr>
+<tr><td>Clé/valeur</td><td><code>map</code> / <code>object</code></td><td><code>{name = "Mabel", age = 52}</code></td></tr>
+<tr><td>Absence</td><td><code>null</code></td><td>l'argument est traité comme omis (valeur par défaut, ou erreur s'il est obligatoire)</td></tr>
+</table></div>
+<p>Conversions automatiques : un nombre ou un booléen devient une chaîne si besoin (<code>15</code> ↔ <code>"15"</code>), et une chaîne valide devient un nombre ou un booléen. Pas de conversion automatique avec l'opérateur d'égalité. Pour un <code>set</code>, convertis d'abord : <code>tolist(var.mon_set)</code>.</p>
+
+<h2>2.3 Références : comment lire une valeur</h2>
+<div class="tbl"><table>
+<tr><th>Écriture</th><th>Signification</th></tr>
+<tr><td><code>var.NOM</code></td><td>valeur d'une variable d'entrée</td></tr>
+<tr><td><code>local.NOM</code></td><td>valeur d'un local</td></tr>
+<tr><td><code>TYPE.NOM</code></td><td>une ressource gérée, ex. <code>random_pet.serveur</code></td></tr>
+<tr><td><code>data.TYPE.NOM</code></td><td>une data source</td></tr>
+<tr><td><code>module.NOM</code></td><td>résultat d'un module ; ses sorties : <code>module.NOM.SORTIE</code></td></tr>
+<tr><td><code>path.module</code> · <code>path.root</code> · <code>path.cwd</code></td><td>chemin du module courant · du module racine · du dossier où Terraform a été lancé</td></tr>
+<tr><td><code>terraform.workspace</code></td><td>nom du workspace sélectionné</td></tr>
+<tr><td><code>count.index</code> · <code>each.key</code> / <code>each.value</code> · <code>self</code></td><td>instance courante (boucles) · ressource courante (provisioners)</td></tr>
+</table></div>
+
+<h2>2.4 Conditions et boucles for</h2>
+<pre class="code" data-l="hcl" data-file="expressions.tf">
+# Condition : condition ? valeur_si_vrai : valeur_si_faux
+var.a == "" ? "default-a" : var.a
+
+# Les deux résultats doivent avoir le même type : convertis explicitement si besoin
+var.example ? tostring(12) : "hello"
+
+# Expression for -> liste
+[for s in var.list : upper(s)]
+
+# Expression for -> map, avec filtre
+{for s in var.list : s => upper(s) if s != ""}
+
+# Avec deux symboles : index+valeur (liste) ou clé+valeur (map)
+[for i, v in var.list : "${i} is ${v}"]
+</pre>
+<div class="box attention"><span class="t">À savoir</span>
+<p>Entre crochets <code>[ ]</code> tu obtiens une liste (tuple) ; entre accolades <code>{ }</code> un objet, et il faut alors fournir clé et valeur séparées par <code>=&gt;</code>. Le suffixe <code>...</code> après la valeur regroupe les doublons de clé dans des listes.</p></div>
+
+<h2>2.5 Les fonctions</h2>
+<p>On appelle une fonction par son nom et ses arguments entre parenthèses : <code>max(5, 12, 9)</code> renvoie <code>12</code>. La doc les range par familles :</p>
+<div class="tbl"><table>
+<tr><th>Famille</th><th>Exemples</th></tr>
+<tr><td>Chaînes</td><td><code>chomp</code> <code>join</code> <code>lower</code> <code>upper</code></td></tr>
+<tr><td>Collections</td><td><code>compact</code> <code>concat</code> <code>flatten</code> <code>keys</code></td></tr>
+<tr><td>Numérique</td><td><code>ceil</code> <code>floor</code> <code>max</code> <code>min</code></td></tr>
+<tr><td>Encodage</td><td><code>base64encode</code> <code>jsondecode</code> <code>jsonencode</code> <code>yamlencode</code></td></tr>
+<tr><td>Fichiers</td><td><code>abspath</code> <code>basename</code> <code>file</code> <code>templatefile</code></td></tr>
+<tr><td>Date/heure</td><td><code>formatdate</code> <code>timeadd</code> <code>timecmp</code> <code>timestamp</code></td></tr>
+<tr><td>Hash/crypto</td><td><code>md5</code> <code>sha256</code> <code>uuid</code> <code>bcrypt</code></td></tr>
+<tr><td>Réseau IP</td><td><code>cidrhost</code> <code>cidrnetmask</code> <code>cidrsubnet</code> <code>cidrsubnets</code></td></tr>
+<tr><td>Conversion</td><td><code>can</code> <code>tolist</code> <code>tomap</code> <code>try</code></td></tr>
+</table></div>
+<div class="box astuce"><span class="t">Astuce</span>
+<p><code>terraform console</code> est ton bac à sable : tu y testes fonctions et expressions <b>sans rien déployer</b>, même quand le state est vide. Sortie par <code>exit</code>, Ctrl-C ou Ctrl-D. En script : <code>echo 'split(",", "foo,bar,baz")' | terraform console</code>.</p></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 2</span><h3>Le bac à sable : terraform console</h3><span class="dur">≈ 20 min · aucun fichier à créer</span></div>
+<p>Place-toi dans le dossier du TD 1 (ou dans n'importe quel dossier), puis ouvre la console. Tape chaque expression et compare avec le résultat attendu.</p>
+<ol class="steps">
+<li><b>Ouvre la console et teste des chaînes.</b>
+<pre class="code" data-l="sh">
+$ terraform console
+&gt; upper("terraform")
+&gt; join("-", ["a", "b", "c"])
+&gt; "Bonjour ${upper("alex")}"
+</pre>
+<p class="expect">Attendu : <code>"TERRAFORM"</code>, <code>"a-b-c"</code>, <code>"Bonjour ALEX"</code>.</p></li>
+<li><b>Types et conversions.</b>
+<pre class="code" data-l="sh">
+&gt; tostring(15)
+&gt; tolist(toset(["b", "a", "b"]))
+&gt; length({ a = 1, b = 2 })
+</pre>
+<p class="expect">Attendu : <code>"15"</code>, <code>tolist(["a", "b"])</code> (un <code>set</code> n'a pas de doublon) et <code>2</code>. Question : pourquoi le résultat est-il trié et sans doublon ?</p></li>
+<li><b>Une condition.</b>
+<pre class="code" data-l="sh">
+&gt; 5 &gt; 3 ? "grand" : "petit"
+&gt; "" == "" ? "vide" : "plein"
+</pre>
+<p class="expect">Attendu : <code>"grand"</code> et <code>"vide"</code>.</p></li>
+<li><b>Des expressions for.</b>
+<pre class="code" data-l="sh">
+&gt; [for s in ["a", "b", "c"] : upper(s)]
+&gt; { for s in ["a", "b"] : s =&gt; upper(s) }
+&gt; [for i, v in ["x", "y"] : "${i}-${v}"]
+&gt; [for n in [1, 2, 3, 4] : n * 10 if n &gt; 2]
+</pre>
+<p class="expect">Attendu : <code>["A", "B", "C"]</code>, un objet <code>{ "a" = "A", "b" = "B" }</code>, <code>["0-x", "1-y"]</code> et <code>[30, 40]</code> (la console les affiche sur plusieurs lignes).</p></li>
+<li><b>Calculer un réseau et sortir.</b>
+<pre class="code" data-l="sh">
+&gt; cidrsubnet("10.0.0.0/16", 8, 2)
+&gt; cidrnetmask("172.16.0.0/12")
+&gt; exit
+</pre>
+<p class="expect">Attendu : <code>"10.0.2.0/24"</code> et <code>"255.240.0.0"</code> (la doc donne ce second exemple). Défi : trouve la fonction qui renvoie le plus grand de 3 nombres.</p></li>
+</ol>
+<details class="sol"><summary>Corrigé du défi</summary><p><code>max(5, 12, 9)</code> renvoie <code>12</code> : c'est l'exemple de la documentation.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 2</h2>
+<div class="quiz" data-p="2"></div>
+<nav class="pager" aria-label="Parties"><a href="p1.html"><small>← Partie précédente</small>1 · Le déclic</a><a class="next" href="p3.html"><small>Partie suivante →</small>3 · Providers</a></nav></main><footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer><script src="data.js"></script><script src="app.js"></script></body></html>

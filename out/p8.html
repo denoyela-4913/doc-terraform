@@ -1,0 +1,215 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="claude:viewport-fit-sides" content="cover"><title>Partie 8 · Pro : sécurité, CI, projet final</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"><link rel="stylesheet" href="style.css"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body data-part="8"><header class="top"><div class="top-in"><a class="brand" href="index.html"><i><b></b><b></b><b></b><b></b></i>Terraform en un jour</a><nav class="nav" aria-label="Navigation"><a href="index.html">Accueil</a><a href="p1.html">1 · Le déclic</a><a href="p2.html">2 · Parler HCL</a><a href="p3.html">3 · Providers</a><a href="p4.html">4 · Variables</a><a href="p5.html">5 · Boucles</a><a href="p6.html">6 · State</a><a href="p7.html">7 · Modules</a><a href="p8.html" aria-current="page">8 · Pro</a><a href="flashcards.html">Flashcards</a><a href="mindmap.html">Mindmap</a><a href="fiche.html">Fiche</a><a href="bd.html">BD</a><a href="pieges.html">Pièges</a><a href="quiz.html">Quiz final</a><a href="sources.html">Sources</a></nav><button class="theme" type="button">Thème</button></div></header><main class="wrap" id="main"><div class="kicker">Partie 8 sur 8 · 17:50 – 18:50</div>
+<h1>Pro : sécurité, CI, projet final</h1>
+<p class="lead">Ce qui sépare un TP d'un usage en équipe : protéger les secrets, automatiser sans surprise, déboguer, savoir ce qu'on ne fait pas. Puis tu mets tout ensemble avec un vrai conteneur.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Savoir où vivent les secrets et comment limiter les dégâts.</li>
+<li>Construire une chaîne d'automatisation sûre : <code>fmt</code> → <code>validate</code> → <code>plan -out</code> → <code>apply</code>.</li>
+<li>Déboguer avec <code>TF_LOG</code>, reconnaître les mauvaises pratiques (<code>-target</code>, provisioners).</li>
+<li>Déployer un conteneur nginx avec Docker de bout en bout.</li>
+</ul></div>
+
+<h2>8.1 Secrets et state</h2>
+<div class="pair">
+<div class="bad"><b>Ce que sensitive ne fait pas</b>Il masque la valeur à l'écran. Elle reste <b>dans le state et les fichiers de plan</b>. Le state local est stocké « dans un fichier en clair », qui inclut les valeurs secrètes que tu as définies.</div>
+<div class="good"><b>Ce que la doc recommande</b>Stocker le state à distance, le <b>chiffrer au repos</b>, restreindre l'accès, <b>journaliser les accès</b>. Et utiliser les valeurs <b>éphémères</b> quand c'est possible.</div></div>
+<ul>
+<li><code>ephemeral</code> (variables et sorties de modules enfants, Terraform 1.10+) et les <b>arguments write-only</b> (1.11+) ne sont écrits ni dans le state ni dans le plan. Combine <code>ephemeral</code> et <code>sensitive</code> pour aussi masquer à l'écran.</li>
+<li><code>random_password</code> traite son résultat comme sensible, mais il est <b>stocké dans le state</b> : la doc du provider recommande la variante éphémère pour les arguments write-only.</li>
+<li>Ne mets jamais d'identifiants dans la configuration (ni dans le bloc <code>backend</code>) : ils finissent dans le state et les plans.</li>
+</ul>
+
+<h2>8.2 Automatiser sans surprise</h2>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 220" role="img" aria-label="Chaîne d'intégration continue Terraform">
+  <defs><marker id="a8" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <g font-size="13">
+    <rect class="c-acc" x="10" y="40" width="140" height="70" rx="12"/><text x="80" y="68" text-anchor="middle" class="b m t-acc">fmt -check</text><text x="80" y="90" text-anchor="middle" class="mut">style</text>
+    <rect class="c-acc" x="165" y="40" width="140" height="70" rx="12"/><text x="235" y="68" text-anchor="middle" class="b m t-acc">validate</text><text x="235" y="90" text-anchor="middle" class="mut">cohérence</text>
+    <rect class="c-acc" x="320" y="40" width="140" height="70" rx="12"/><text x="390" y="68" text-anchor="middle" class="b m t-acc">test</text><text x="390" y="90" text-anchor="middle" class="mut">.tftest.hcl</text>
+    <rect class="c-chg" x="475" y="40" width="150" height="70" rx="12"/><text x="550" y="68" text-anchor="middle" class="b m t-chg">plan -out</text><text x="550" y="90" text-anchor="middle" class="mut">relu par un humain</text>
+    <rect class="c-add" x="640" y="40" width="150" height="70" rx="12"/><text x="715" y="68" text-anchor="middle" class="b m t-add">apply tfplan</text><text x="715" y="90" text-anchor="middle" class="mut">exactement ce plan</text>
+  </g>
+  <path class="ln" d="M150 75 L161 75" marker-end="url(#a8)"/><path class="ln" d="M305 75 L316 75" marker-end="url(#a8)"/>
+  <path class="ln" d="M460 75 L471 75" marker-end="url(#a8)"/><path class="ln" d="M625 75 L636 75" marker-end="url(#a8)"/>
+  <text x="400" y="150" text-anchor="middle" font-size="14">Un fichier de plan fige les décisions : pas de nouvelle planification, pas de confirmation.</text>
+  <text x="400" y="176" text-anchor="middle" class="mut" font-size="13">Valeurs de <tspan class="m">-detailed-exitcode</tspan> : 0 = rien à faire · 1 = erreur · 2 = changements à appliquer</text>
+</svg></div>
+<figcaption>Un enchaînement type. L'approbation humaine se place entre le plan et l'apply.</figcaption>
+</figure>
+
+<div class="tbl"><table>
+<tr><th>Option / variable</th><th>À savoir (doc officielle)</th></tr>
+<tr><td><code>plan -out=FICHIER</code> puis <code>apply FICHIER</code></td><td>L'apply applique « exactement » le plan sauvegardé ; <code>-auto-approve</code> est ignoré (le fichier vaut approbation) et aucun autre mode ou option de planification n'est accepté.</td></tr>
+<tr><td><code>apply -auto-approve</code></td><td>Saute la confirmation, <b>y compris pour des destructions</b>. En automatisation, planifie et relis d'abord.</td></tr>
+<tr><td><code>-detailed-exitcode</code></td><td>0 pas de changement · 1 erreur · 2 succès avec changements.</td></tr>
+<tr><td><code>-target=ADRESSE</code></td><td>Réservé aux cas exceptionnels (réparer une erreur, contourner une limite). En routine, risque de dérive non détectée.</td></tr>
+<tr><td><code>-lock=false</code> / <code>-lock-timeout=3s</code></td><td>Désactiver le verrou est dangereux si d'autres lancent des commandes sur le même workspace. Préfère attendre avec <code>-lock-timeout</code>.</td></tr>
+<tr><td><code>-parallelism=n</code></td><td>Limite les opérations concurrentes (10 par défaut).</td></tr>
+<tr><td><code>TF_IN_AUTOMATION</code> · <code>TF_INPUT=false</code></td><td>Cosmétique (plus de suggestions de commandes) · ne jamais demander de saisie.</td></tr>
+<tr><td><code>TF_CLI_ARGS</code> · <code>TF_CLI_ARGS_plan</code></td><td>Ajoute des arguments à toutes les commandes, ou à une seule.</td></tr>
+</table></div>
+
+<pre class="code" data-l="sh" data-file="garde-ci.sh">
+terraform fmt -check -recursive
+terraform validate
+terraform plan -out=tfplan -detailed-exitcode
+code=$?
+if [ "$code" -eq 1 ]; then echo "erreur de plan"; exit 1; fi
+if [ "$code" -eq 2 ]; then echo "des changements sont prevus : relecture humaine requise"; fi
+# apres approbation :
+terraform apply tfplan
+</pre>
+
+<h2>8.3 Déboguer</h2>
+<ul>
+<li><code>TF_LOG</code> prend un niveau : <code>TRACE</code> (le plus verbeux), <code>DEBUG</code>, <code>INFO</code>, <code>WARN</code>, <code>ERROR</code>. Les logs vont sur <code>stderr</code>.</li>
+<li><code>TF_LOG_PATH=fichier</code> les ajoute à un fichier, mais <b><code>TF_LOG</code> doit aussi être défini</b>. <code>TF_LOG_CORE</code> et <code>TF_LOG_PROVIDER</code> séparent le cœur et les providers.</li>
+<li>Pour désactiver : <code>unset TF_LOG</code> ou <code>TF_LOG=off</code>.</li>
+</ul>
+<pre class="code" data-l="sh">
+$ TF_LOG=INFO TF_LOG_PATH=/tmp/tf.log terraform plan
+$ head -2 /tmp/tf.log
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+2026-10-28T22:34:15.615+0100 [INFO]  Terraform version: 1.17.1
+2026-10-28T22:34:15.615+0100 [INFO]  Go runtime version: go1.26.10
+</pre>
+<div class="box attention"><span class="t">Prudence</span>
+<p>Les logs détaillés peuvent contenir des valeurs de ta configuration. Ne les publie pas tels quels. La doc précise aussi que le format <code>TF_LOG=JSON</code> n'est pas une interface stable.</p></div>
+
+<h2>8.4 Provisioners : en dernier recours</h2>
+<p>La doc est nette : Terraform est conçu pour l'infrastructure immuable, et « tu dois épuiser toutes les alternatives avant d'utiliser des provisioners ». Elle conseille d'abord la documentation du provider, une demande de fonctionnalité, ou une image/gestion de configuration. Si tu en as vraiment besoin :</p>
+<pre class="code" data-l="hcl">
+resource "terraform_data" "bonjour" {
+  provisioner "local-exec" {
+    command = "echo bonjour depuis un provisioner > provisioner.txt"
+  }
+}
+</pre>
+<ul>
+<li>Un provisioner qui échoue fait échouer l'apply (<code>on_failure = continue</code> pour ignorer).</li>
+<li><code>when = destroy</code> l'exécute avant la destruction ; s'il échoue, il sera rejoué au prochain apply : écris-le idempotent.</li>
+<li><code>terraform_data</code> permet d'en lancer sans les lier à une ressource précise.</li>
+</ul>
+
+<h2>8.5 Que mettre dans Git ?</h2>
+<div class="pair">
+<div class="good"><b>À versionner</b><code>*.tf</code>, <code>.terraform.lock.hcl</code> (recommandé par la doc), tests <code>*.tftest.hcl</code>, README.</div>
+<div class="bad"><b>À ne pas versionner</b><code>.terraform/</code> (providers téléchargés), <code>terraform.tfstate</code> et <code>.backup</code> (secrets possibles), fichiers de plan, <code>*.tfvars</code> contenant des secrets.</div></div>
+<p class="src">La doc state et init recommandent de versionner le lock file et de ne pas versionner le state. Le détail du <code>.gitignore</code> est une convention courante.</p>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 8</span><h3>Projet final : un site nginx avec Docker</h3><span class="dur">≈ 35 min · Docker requis</span></div>
+<p>Tu déploies un conteneur nginx, tu changes son port, tu valides tes entrées et tu nettoies. Prérequis : Docker qui tourne, ton utilisateur autorisé à l'utiliser, et le port 8000 libre. Le provider est <code>kreuzwerker/docker</code> (celui du tutoriel officiel).</p>
+<ol class="steps">
+<li><b>Écris le projet.</b> Dans un dossier <code>td8</code> :
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 4.2.0"
+    }
+  }
+}
+
+provider "docker" {}
+
+variable "port_externe" {
+  type        = number
+  description = "Port local expose par nginx"
+  default     = 8000
+
+  validation {
+    condition     = var.port_externe >= 1024 && var.port_externe <= 65535
+    error_message = "Choisis un port entre 1024 et 65535."
+  }
+}
+
+resource "docker_image" "nginx" {
+  name         = "nginx:latest"
+  keep_locally = false
+}
+
+resource "docker_container" "nginx" {
+  image = docker_image.nginx.image_id
+  name  = "tutorial"
+
+  ports {
+    internal = 80
+    external = var.port_externe
+  }
+}
+
+output "url" {
+  description = "Adresse du site"
+  value       = "http://localhost:${var.port_externe}"
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+$ terraform fmt -check
+$ terraform validate
+</pre>
+<p class="expect">Attendu : le provider <code>kreuzwerker/docker</code> v4.2.x s'installe, puis « The configuration is valid ».</p></li>
+<li><b>Planifie dans un fichier, puis applique ce plan.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -out=tfplan -detailed-exitcode ; echo "code : $?"
+$ terraform apply tfplan
+</pre>
+<p class="expect">Le code de retour du plan est <b>2</b> (changements à appliquer). L'apply se termine par « Apply complete! Resources: 2 added » et affiche <code>url = "http://localhost:8000"</code>.</p></li>
+<li><b>Vérifie que ça tourne vraiment.</b>
+<pre class="code" data-l="sh">
+$ curl -s localhost:8000 | grep -o "&lt;title&gt;.*&lt;/title&gt;"
+$ docker ps --format '{{.Names}}  {{.Ports}}' | grep tutorial
+$ terraform plan -detailed-exitcode ; echo "code : $?"
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+&lt;title&gt;Welcome to nginx!&lt;/title&gt;
+tutorial  0.0.0.0:8000-&gt;80/tcp
+code : 0
+</pre>
+<p class="expect">Un second plan renvoie <b>0</b> : l'infrastructure correspond à la configuration.</p></li>
+<li><b>Change le port et valide tes entrées.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -var port_externe=80
+$ terraform plan -var port_externe=8080
+$ terraform apply -auto-approve -var port_externe=8080
+$ curl -s -o /dev/null -w "%{http_code}\n" localhost:8080
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+Error: Invalid value for variable
+Choisis un port entre 1024 et 65535.
+
+  # docker_container.nginx must be replaced
+          ~ external = 8000 -> 8080 # forces replacement
+Plan: 1 to add, 0 to change, 1 to destroy.
+
+200
+</pre>
+<p class="expect">Le port 80 est refusé par ta validation. Le changement de port <b>force le remplacement</b> du conteneur (<code>-/+</code>). Le site répond sur 8080 et plus sur 8000.</p></li>
+<li><b>Active les logs, puis détruis proprement.</b>
+<pre class="code" data-l="sh">
+$ TF_LOG=INFO TF_LOG_PATH=/tmp/tf.log terraform plan -var port_externe=8080
+$ head -2 /tmp/tf.log
+$ terraform destroy -auto-approve -var port_externe=8080
+$ docker ps -a --format '{{.Names}}' | grep -c tutorial
+</pre>
+<p class="expect">Attendu : « Destroy complete! Resources: 2 destroyed. » et le dernier compte vaut <b>0</b> : plus de conteneur <code>tutorial</code>. Terraform a tout nettoyé, c'est le but.</p></li>
+</ol>
+<details class="sol"><summary>Défis pour continuer</summary>
+<ul>
+<li>Ajoute un second conteneur avec <code>for_each</code> sur une map <code>{ web = 8000, api = 8001 }</code> (attention à l'attribut <code>name</code>, unique par conteneur).</li>
+<li>Passe le code dans un module <code>modules/site</code> avec une variable <code>port</code> et un output <code>url</code>.</li>
+<li>Écris un <code>.tftest.hcl</code> avec <code>command = plan</code> qui vérifie que <code>output.url</code> vaut <code>http://localhost:8000</code>.</li>
+</ul></details>
+</div>
+
+<h2>Mini-quiz de la partie 8</h2>
+<div class="quiz" data-p="8"></div>
+<div class="box retenir"><span class="t">Journée terminée</span>
+<p>Il te reste à passer les <a href="flashcards.html">flashcards</a>, à parcourir la <a href="fiche.html">fiche de référence</a>, puis à tenter le <a href="quiz.html">quiz final</a>.</p></div>
+<nav class="pager" aria-label="Parties"><a href="p7.html"><small>← Partie précédente</small>7 · Modules</a><a class="next" href="quiz.html"><small>Pour finir →</small>Quiz final</a></nav></main><footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer><script src="data.js"></script><script src="app.js"></script></body></html>

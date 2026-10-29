@@ -1,0 +1,48 @@
+<!--title:Sources et méthode-->
+<div class="kicker">Transparence</div>
+<h1>Sources et méthode</h1>
+<p class="lead">Le fond de ce parcours vient de la documentation officielle HashiCorp. Voici les pages lues, et comment les TD ont été vérifiés.</p>
+
+<h2>Documentation officielle (v1.17.x)</h2>
+<div class="tbl"><table>
+<tr><th>Sujet</th><th>Page</th></tr>
+<tr><td>Introduction</td><td><a href="https://developer.hashicorp.com/terraform/intro">terraform/intro</a></td></tr>
+<tr><td>plan · apply · destroy</td><td><a href="https://developer.hashicorp.com/terraform/cli/run">terraform/cli/run</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/plan">commands/plan</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/apply">commands/apply</a></td></tr>
+<tr><td>init · fmt · validate · console · graph</td><td><a href="https://developer.hashicorp.com/terraform/cli/commands/init">init</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/fmt">fmt</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/validate">validate</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/console">console</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/graph">graph</a></td></tr>
+<tr><td>Syntaxe, fichiers, style</td><td><a href="https://developer.hashicorp.com/terraform/language/syntax/configuration">syntax/configuration</a> · <a href="https://developer.hashicorp.com/terraform/language/files">files</a> · <a href="https://developer.hashicorp.com/terraform/language/style">style</a></td></tr>
+<tr><td>Types, références, conditions, for, dynamic</td><td><a href="https://developer.hashicorp.com/terraform/language/expressions/types">types</a> · <a href="https://developer.hashicorp.com/terraform/language/expressions/references">references</a> · <a href="https://developer.hashicorp.com/terraform/language/expressions/conditionals">conditionals</a> · <a href="https://developer.hashicorp.com/terraform/language/expressions/for">for</a> · <a href="https://developer.hashicorp.com/terraform/language/expressions/dynamic-blocks">dynamic-blocks</a></td></tr>
+<tr><td>Fonctions</td><td><a href="https://developer.hashicorp.com/terraform/language/functions">language/functions</a></td></tr>
+<tr><td>Providers, versions</td><td><a href="https://developer.hashicorp.com/terraform/language/providers/requirements">providers/requirements</a> · <a href="https://developer.hashicorp.com/terraform/language/expressions/version-constraints">version-constraints</a></td></tr>
+<tr><td>Resources, data sources</td><td><a href="https://developer.hashicorp.com/terraform/language/resources/syntax">resources/syntax</a> · <a href="https://developer.hashicorp.com/terraform/language/data-sources">data-sources</a></td></tr>
+<tr><td>Variables, locals, outputs</td><td><a href="https://developer.hashicorp.com/terraform/language/values/variables">variables</a> · <a href="https://developer.hashicorp.com/terraform/language/values/locals">locals</a> · <a href="https://developer.hashicorp.com/terraform/language/values/outputs">outputs</a></td></tr>
+<tr><td>Méta-arguments</td><td><a href="https://developer.hashicorp.com/terraform/language/meta-arguments/count">count</a> · <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/for_each">for_each</a> · <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/depends_on">depends_on</a> · <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle">lifecycle</a></td></tr>
+<tr><td>State, backends, workspaces</td><td><a href="https://developer.hashicorp.com/terraform/language/state">state</a> · <a href="https://developer.hashicorp.com/terraform/cli/commands/state">commands/state</a> · <a href="https://developer.hashicorp.com/terraform/language/backend">backend</a> · <a href="https://developer.hashicorp.com/terraform/cli/workspaces">workspaces</a></td></tr>
+<tr><td>Import, moved</td><td><a href="https://developer.hashicorp.com/terraform/language/import">import</a> · <a href="https://developer.hashicorp.com/terraform/language/modules/develop/refactoring">refactoring</a></td></tr>
+<tr><td>Modules, tests</td><td><a href="https://developer.hashicorp.com/terraform/language/modules">modules</a> · <a href="https://developer.hashicorp.com/terraform/language/tests">tests</a></td></tr>
+<tr><td>Secrets, provisioners, débogage, environnement</td><td><a href="https://developer.hashicorp.com/terraform/language/manage-sensitive-data">manage-sensitive-data</a> · <a href="https://developer.hashicorp.com/terraform/language/provisioners">provisioners</a> · <a href="https://developer.hashicorp.com/terraform/internals/debugging">debugging</a> · <a href="https://developer.hashicorp.com/terraform/cli/config/environment-variables">environment-variables</a></td></tr>
+<tr><td>Tutoriel Docker (TD 8)</td><td><a href="https://developer.hashicorp.com/terraform/tutorials/docker-get-started/docker-build">docker-get-started</a></td></tr>
+</table></div>
+
+<h2>Documentation des providers</h2>
+<ul>
+<li><a href="https://github.com/hashicorp/terraform-provider-local">hashicorp/local</a> : <code>local_file</code> (<code>docs/resources/file.md</code>) et la data source <code>local_file</code>.</li>
+<li><a href="https://github.com/hashicorp/terraform-provider-random">hashicorp/random</a> : <code>random_pet</code> et <code>random_password</code>.</li>
+<li><a href="https://github.com/kreuzwerker/terraform-provider-docker">kreuzwerker/docker</a> : <code>docker_image</code> et <code>docker_container</code>.</li>
+</ul>
+
+<h2>Méthode de vérification</h2>
+<div class="box doc"><span class="t">Ce qui a été exécuté</span>
+<ul>
+<li>Chaque TD a été rejoué du début à la fin avec <b>Terraform 1.17</b> (providers <code>local</code> 2.9.1, <code>random</code> 3.9.1, <code>docker</code> 4.2.0), puis détruit. Les extraits « observé » sont de vraies sorties, parfois abrégées avec <code>…</code>.</li>
+<li>Le TD 8 a réellement lancé nginx : réponse HTTP 200 sur le port 8000, remplacement du conteneur vers 8080, puis destruction sans conteneur restant.</li>
+<li>Les noms aléatoires (<code>suitable-tiger</code>…), identifiants et empreintes seront différents chez toi.</li>
+</ul></div>
+<div class="box attention"><span class="t">Quand la doc et la réalité divergent</span>
+<p>La page de documentation des <i>outputs</i> laisse entendre qu'un output sensible s'affiche <code>&lt;sensitive&gt;</code> avec <code>terraform output NOM</code>. En 1.17 j'ai observé que <code>terraform output</code> (seul) masque la valeur, mais que <code>terraform output NOM</code>, <code>-raw</code> et <code>-json</code> l'affichent en clair. Le site indique ce qui a été observé.</p></div>
+
+<h2>Limites</h2>
+<ul>
+<li>Ce parcours enseigne les fondations. Il ne couvre pas en détail un cloud particulier (AWS, Azure, GCP), HCP Terraform, ni les Stacks.</li>
+<li>Les versions évoluent : vérifie toujours la documentation correspondant à ta version (<code>terraform version</code>).</li>
+<li>Projet de formation personnel, non affilié à HashiCorp.</li>
+</ul>

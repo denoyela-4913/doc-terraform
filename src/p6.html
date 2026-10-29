@@ -1,0 +1,214 @@
+<!--title:Partie 6 · State, backends, refactoring-->
+<div class="kicker">Partie 6 sur 8 · 15:40 – 16:30</div>
+<h1>State, backends, refactoring</h1>
+<p class="lead">Le state est la <b>mémoire</b> de Terraform. Le comprendre explique presque tous les comportements surprenants : pourquoi un plan veut recréer quelque chose, pourquoi renommer est dangereux, pourquoi les secrets y traînent.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Expliquer le triangle configuration / state / infrastructure réelle.</li>
+<li>Choisir un backend et connaître les commandes <code>terraform state</code>.</li>
+<li>Renommer sans détruire (<code>moved</code>), adopter l'existant (<code>import</code>), détecter une dérive.</li>
+</ul></div>
+
+<h2>6.1 Un triangle à trois sommets</h2>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 390" role="img" aria-label="Triangle entre configuration, state et infrastructure réelle">
+  <defs><marker id="a6" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="c-acc" x="40" y="20" width="240" height="80" rx="14"/>
+  <text x="160" y="54" text-anchor="middle" class="b t-acc" font-size="18">Configuration</text>
+  <text x="160" y="78" text-anchor="middle" font-size="13">ce que tu VEUX (.tf)</text>
+  <rect class="c-rep" x="520" y="20" width="240" height="80" rx="14"/>
+  <text x="640" y="54" text-anchor="middle" class="b t-rep" font-size="18">State</text>
+  <text x="640" y="78" text-anchor="middle" font-size="13">ce que Terraform CROIT gérer</text>
+  <rect class="c-add" x="280" y="240" width="240" height="80" rx="14"/>
+  <text x="400" y="274" text-anchor="middle" class="b t-add" font-size="18">Infrastructure réelle</text>
+  <text x="400" y="298" text-anchor="middle" font-size="13">ce qui EXISTE vraiment</text>
+  <path class="ln" d="M280 60 L516 60" marker-end="url(#a6)"/>
+  <text x="400" y="50" text-anchor="middle" class="m mut" font-size="12">plan compare</text>
+  <path class="ln" d="M200 104 L330 236" marker-end="url(#a6)" stroke-dasharray="6 5"/>
+  <text x="120" y="176" class="m mut" font-size="12">apply (écriture)</text>
+  <path class="ln" d="M470 236 L600 104" marker-end="url(#a6)"/>
+  <text x="548" y="176" class="m mut" font-size="12">refresh (lecture)</text>
+  <text x="400" y="352" text-anchor="middle" font-size="14">Le plan = (configuration) − (state rafraîchi)</text>
+  <text x="400" y="374" text-anchor="middle" class="mut" font-size="13">Si le state est perdu, Terraform ne sait plus que les objets existent.</text>
+</svg></div>
+<figcaption>Le state fait le lien entre les ressources de ta configuration et les objets réels. La doc : il « associe les objets distants aux instances de ressources de ta configuration ».</figcaption>
+</figure>
+
+<h2>6.2 Ce que dit la doc sur le state</h2>
+<ul>
+<li><b>Par défaut</b> : local, dans <code>terraform.tfstate</code>, avec une sauvegarde <code>terraform.tfstate.backup</code>. Aucune configuration, mais collaboration difficile et perte possible du fichier.</li>
+<li><b>Recommandé</b> : HCP Terraform ou un <b>backend distant</b>, avec verrouillage (<em>locking</em>) et contrôle d'accès.</li>
+<li><b>Ne jamais</b> l'éditer à la main (utilise <code>terraform state</code>) ni le mettre dans le contrôle de version : il peut contenir des secrets.</li>
+<li>Pour l'automatisation, préfère <code>terraform output -json</code> et <code>terraform show -json</code> à l'analyse directe du fichier, dont le format peut changer.</li>
+</ul>
+
+<h3>Les commandes <code>terraform state</code></h3>
+<div class="tbl"><table>
+<tr><th>Commande</th><th>Rôle</th></tr>
+<tr><td><code>state list</code></td><td>liste les ressources suivies</td></tr>
+<tr><td><code>state show ADRESSE</code></td><td>détaille une ressource</td></tr>
+<tr><td><code>state mv</code></td><td>change l'adresse d'une ressource dans le state</td></tr>
+<tr><td><code>state rm</code></td><td>« oublie » un objet sans le détruire</td></tr>
+<tr><td><code>state pull</code></td><td>affiche le state brut</td></tr>
+<tr><td><code>state replace-provider</code></td><td>change le provider associé</td></tr>
+</table></div>
+<p class="src">Les commandes qui <b>modifient</b> le state écrivent toujours une sauvegarde (impossible à désactiver) ; les commandes en lecture (<code>list</code>) non.</p>
+
+<h2>6.3 Les backends</h2>
+<pre class="code" data-l="hcl" data-file="backend.tf">
+terraform {
+  backend "remote" {
+    organization = "example_corp"
+
+    workspaces {
+      name = "my-app-prod"
+    }
+  }
+}
+</pre>
+<p>Un <b>backend</b> définit où le state est stocké. Par défaut, c'est <code>local</code>. La doc cite : <code>local</code>, <code>remote</code>, <code>azurerm</code>, <code>consul</code>, <code>cos</code>, <code>gcs</code>, <code>http</code>, <code>kubernetes</code>, <code>oci</code>, <code>oss</code>, <code>pg</code>, <code>s3</code>. On ne peut pas en charger d'autres comme des plugins.</p>
+<div class="box attention"><span class="t">Règles à connaître</span>
+<ul>
+<li>Un seul bloc <code>backend</code> par configuration.</li>
+<li>Il <b>ne peut référencer ni variables, ni locals, ni data sources</b>.</li>
+<li>Avec HCP Terraform, on utilise un bloc <code>cloud</code> : il est incompatible avec <code>backend</code>.</li>
+<li>Pour changer de backend : modifie le bloc, relance <code>terraform init</code>. Terraform propose de migrer le state (<code>-migrate-state</code>) ; <code>-reconfigure</code> l'ignore. Sauvegarde <code>terraform.tfstate</code> d'abord.</li>
+<li>Évite d'écrire des identifiants dans le bloc : ils seraient écrits en clair dans <code>.terraform</code> et dans les plans. Utilise les variables d'environnement ou les fichiers d'identifiants usuels, et la configuration partielle (<code>-backend-config</code>).</li>
+</ul></div>
+
+<h2>6.4 Refactorer sans casse</h2>
+<h3>moved : renommer ou déplacer</h3>
+<pre class="code" data-l="hcl">
+moved {
+  from = random_pet.serveur
+  to   = random_pet.machine
+}
+</pre>
+<p>Sans <code>moved</code>, renommer une ressource dans le code revient pour Terraform à « détruire l'ancienne, créer la nouvelle ». Avec lui, le plan affiche <code>has moved to</code> et ne détruit rien (observé dans le TD). Cas d'usage officiels : renommer, passer d'une ressource unique à <code>for_each</code> (<code>to = aws_instance.a["small"]</code>), déplacer dans un module. <b>Garde les blocs <code>moved</code></b> : les retirer est un changement cassant pour qui utilise ton module.</p>
+
+<h3>import : adopter l'existant</h3>
+<p>Le bloc <code>import</code> rattache un objet qui existe déjà à une adresse de ta configuration. Avec <code>terraform plan -generate-config-out</code>, Terraform peut même écrire le bloc <code>resource</code> correspondant. Détail de syntaxe : le <a href="https://developer.hashicorp.com/terraform/language/block/import">bloc import</a> dans la doc.</p>
+
+<h3>refresh-only : constater une dérive</h3>
+<p><code>terraform plan -refresh-only</code> produit un plan « dont le seul but est d'aligner le state et les outputs sur les modifications faites hors de Terraform » : il montre la dérive sans rien défaire.</p>
+
+<h2>6.5 Les workspaces CLI</h2>
+<p>Un workspace est « une instance distincte de données d'état à l'intérieur du même répertoire de travail ». Tout répertoire initialisé démarre avec le workspace <code>default</code>. Commandes : <code>terraform workspace list | new | select | delete</code> ; <code>terraform.workspace</code> donne le nom courant.</p>
+<div class="box danger"><span class="t">Ce n'est pas un outil d'isolation</span>
+<p>Selon la doc, les workspaces ne sont « pas un mécanisme d'isolation adapté » quand on veut une séparation forte entre déploiements (ex. dev et prod), puisqu'ils partagent le même backend. Ils ne conviennent pas non plus à la décomposition d'un système en sous-systèmes : « chaque sous-système doit avoir sa propre configuration et son propre backend ».</p></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 6</span><h3>Inspecter, renommer, dériver, oublier</h3><span class="dur">≈ 30 min · aucun compte cloud</span></div>
+<ol class="steps">
+<li><b>Crée et applique, puis ouvre le capot.</b> Dans un dossier <code>td6</code> :
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+resource "random_pet" "serveur" {
+  length = 2
+}
+
+resource "local_file" "salut" {
+  filename = "${path.module}/salut-${terraform.workspace}.txt"
+  content  = "Serveur : ${random_pet.serveur.id}\n"
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init &amp;&amp; terraform apply -auto-approve
+$ terraform state list
+$ terraform state show random_pet.serveur
+$ head -c 200 terraform.tfstate
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+local_file.salut
+random_pet.serveur
+# random_pet.serveur:
+resource "random_pet" "serveur" {
+    id        = "flowing-ox"
+    length    = 2
+    separator = "-"
+}
+{
+  "version": 4,
+  "terraform_version": "1.17.1",
+  ...
+</pre>
+<p class="expect">Le state est un JSON en clair : tu y lis les valeurs de tes ressources. Garde-le à l'esprit pour la partie 8.</p></li>
+<li><b>Renomme avec moved.</b> Dans <code>main.tf</code>, remplace <code>"serveur"</code> par <code>"machine"</code> (dans le bloc <b>et</b> dans <code>random_pet.serveur.id</code>), puis ajoute à la fin :
+<pre class="code" data-l="hcl">
+moved {
+  from = random_pet.serveur
+  to   = random_pet.machine
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform plan
+$ terraform apply -auto-approve
+$ terraform state list
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+  # random_pet.serveur has moved to random_pet.machine
+Plan: 0 to add, 0 to change, 0 to destroy.
+</pre>
+<p class="expect">Zéro destruction. Essaie ensuite avec un autre nom et <b>sans</b> bloc <code>moved</code> : le plan annonce « Plan: 2 to add, 0 to change, 2 to destroy » (observé), car l'ancienne adresse « is not in configuration ».</p></li>
+<li><b>Crée une dérive.</b> Modifie le fichier hors de Terraform, puis regarde.
+<pre class="code" data-l="sh">
+$ echo "modifie a la main" &gt; salut-default.txt
+$ terraform plan -refresh-only
+</pre>
+<pre class="code" data-l="out" data-file="extrait, observé">
+Note: Objects have changed outside of Terraform
+
+  # local_file.salut has been deleted
+  - resource "local_file" "salut" {
+      ...
+This is a refresh-only plan, so Terraform will not take any actions to undo
+</pre>
+<p class="expect">Pour <code>local_file</code>, un contenu modifié est vu comme « supprimé » (c'est le comportement de ce provider). Répare : <code>terraform apply -auto-approve</code>, puis <code>cat salut-default.txt</code> retrouve « Serveur : … ».</p></li>
+<li><b>Fais « oublier » une ressource à Terraform.</b>
+<pre class="code" data-l="sh">
+$ terraform state rm local_file.salut
+$ terraform state list
+$ terraform plan
+$ ls salut-default.txt
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+Successfully removed 1 resource instance(s).
+random_pet.machine
+  # local_file.salut will be created
+Plan: 1 to add, 0 to change, 0 to destroy.
+salut-default.txt
+</pre>
+<p class="expect">Le fichier existe encore, mais Terraform ne le connaît plus : il veut le « créer ». Un <code>terraform apply -auto-approve</code> le réadopte.</p></li>
+<li><b>Essaie un workspace, puis nettoie tout.</b>
+<pre class="code" data-l="sh">
+$ terraform workspace new test
+$ terraform apply -auto-approve
+$ ls salut-*.txt
+$ terraform workspace list
+$ terraform destroy -auto-approve
+$ terraform workspace select default
+$ terraform workspace delete test
+$ terraform destroy -auto-approve
+</pre>
+<p class="expect">Attendu : deux fichiers (<code>salut-default.txt</code> et <code>salut-test.txt</code>), un state par workspace. Le <code>terraform.workspace</code> dans le nom de fichier évite qu'ils s'écrasent. À la fin, plus aucun <code>salut-*.txt</code>.</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<p>Fais <code>terraform state pull | head -20</code>, puis <code>terraform show -json | head -c 300</code> : ce sont les sorties que la doc recommande pour scripter plutôt que lire le fichier à la main.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 6</h2>
+<div class="quiz" data-p="6"></div>

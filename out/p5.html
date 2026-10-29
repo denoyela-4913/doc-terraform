@@ -1,0 +1,199 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="claude:viewport-fit-sides" content="cover"><title>Partie 5 · Boucles et cycle de vie</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"><link rel="stylesheet" href="style.css"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body data-part="5"><header class="top"><div class="top-in"><a class="brand" href="index.html"><i><b></b><b></b><b></b><b></b></i>Terraform en un jour</a><nav class="nav" aria-label="Navigation"><a href="index.html">Accueil</a><a href="p1.html">1 · Le déclic</a><a href="p2.html">2 · Parler HCL</a><a href="p3.html">3 · Providers</a><a href="p4.html">4 · Variables</a><a href="p5.html" aria-current="page">5 · Boucles</a><a href="p6.html">6 · State</a><a href="p7.html">7 · Modules</a><a href="p8.html">8 · Pro</a><a href="flashcards.html">Flashcards</a><a href="mindmap.html">Mindmap</a><a href="fiche.html">Fiche</a><a href="bd.html">BD</a><a href="pieges.html">Pièges</a><a href="quiz.html">Quiz final</a><a href="sources.html">Sources</a></nav><button class="theme" type="button">Thème</button></div></header><main class="wrap" id="main"><div class="kicker">Partie 5 sur 8 · 14:35 – 15:25</div>
+<h1>Boucles et cycle de vie</h1>
+<p class="lead">Créer dix ressources sans écrire dix blocs, et contrôler finement ce que Terraform a le droit de faire. Le sujet le plus piégeux du début : <code>count</code> contre <code>for_each</code>.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Choisir entre <code>count</code> et <code>for_each</code>, et expliquer pourquoi.</li>
+<li>Écrire un bloc <code>dynamic</code> et savoir quand l'éviter.</li>
+<li>Utiliser <code>lifecycle</code> : <code>prevent_destroy</code>, <code>create_before_destroy</code>, <code>ignore_changes</code>, <code>replace_triggered_by</code>, conditions.</li>
+</ul></div>
+
+<h2>5.1 count : N instances numérotées</h2>
+<pre class="code" data-l="hcl">
+resource "local_file" "copie" {
+  count    = 3                                  # un entier
+  filename = "${path.module}/copie-${count.index}.txt"   # count.index : 0, 1, 2
+  content  = "copie numero ${count.index}\n"
+}
+# adresses : local_file.copie[0]  local_file.copie[1]  local_file.copie[2]
+</pre>
+<p><code>count</code> sert aussi de <b>interrupteur</b> : <code>count = var.creer_bonus ? 1 : 0</code> crée la ressource ou non. Limites : la valeur doit être connue avant toute opération distante (pas d'attribut calculé à l'apply), et on ne combine pas <code>count</code> et <code>for_each</code> dans un même bloc.</p>
+
+<h2>5.2 for_each : une instance par clé</h2>
+<pre class="code" data-l="hcl">
+resource "local_file" "avec_for_each" {
+  for_each = toset(var.noms)                 # une MAP ou un SET de strings
+  filename = "${path.module}/fe-${each.key}.txt"
+  content  = "salut ${each.key}\n"
+}
+# adresses : local_file.avec_for_each["alice"]  ["bob"]  ["chloe"]
+</pre>
+<p><code>each.key</code> est la clé de la map (ou l'élément du set) ; <code>each.value</code> est la valeur (identique à la clé pour un set). Une liste ne passe pas telle quelle : <code>toset()</code> (les listes ne sont pas converties implicitement).</p>
+<p>Limites : clés connues avant l'apply, pas de valeurs sensibles, pas de fonctions impures comme <code>uuid</code> ou <code>timestamp</code>.</p>
+
+<h3>Le piège, mis en image</h3>
+<p>On retire <b>bob</b> de la liste <code>["alice", "bob", "chloe"]</code>. Résultat observé avec Terraform 1.17.0 :</p>
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 330" role="img" aria-label="Retirer bob avec count décale les indices, avec for_each seule la clé bob disparaît">
+  <text x="200" y="26" text-anchor="middle" class="b" font-size="17">count</text>
+  <text x="600" y="26" text-anchor="middle" class="b" font-size="17">for_each</text>
+  <line class="ln" x1="400" y1="40" x2="400" y2="300" stroke-dasharray="4 6"/>
+  <g font-size="13.5" class="m">
+    <rect class="bx" x="40" y="50" width="150" height="34" rx="8"/><text x="115" y="72" text-anchor="middle">[0] alice</text>
+    <rect class="bx" x="40" y="92" width="150" height="34" rx="8"/><text x="115" y="114" text-anchor="middle">[1] bob</text>
+    <rect class="bx" x="40" y="134" width="150" height="34" rx="8"/><text x="115" y="156" text-anchor="middle">[2] chloe</text>
+    <rect class="bx" x="440" y="50" width="150" height="34" rx="8"/><text x="515" y="72" text-anchor="middle">["alice"]</text>
+    <rect class="bx" x="440" y="92" width="150" height="34" rx="8"/><text x="515" y="114" text-anchor="middle">["bob"]</text>
+    <rect class="bx" x="440" y="134" width="150" height="34" rx="8"/><text x="515" y="156" text-anchor="middle">["chloe"]</text>
+  </g>
+  <text x="200" y="196" text-anchor="middle" class="mut" font-size="13">on retire bob → la liste devient [alice, chloe]</text>
+  <text x="600" y="196" text-anchor="middle" class="mut" font-size="13">on retire bob → l'ensemble devient {alice, chloe}</text>
+  <g font-size="13.5" class="m">
+    <rect class="bx" x="40" y="212" width="150" height="34" rx="8"/><text x="115" y="234" text-anchor="middle">[0] alice  =</text>
+    <rect class="c-rep" x="40" y="252" width="150" height="34" rx="8"/><text x="115" y="274" text-anchor="middle">[1] bob→chloe</text>
+    <rect class="c-del" x="40" y="292" width="150" height="34" rx="8"/><text x="115" y="314" text-anchor="middle">[2] détruit</text>
+    <rect class="bx" x="440" y="212" width="150" height="34" rx="8"/><text x="515" y="234" text-anchor="middle">["alice"]  =</text>
+    <rect class="c-del" x="440" y="252" width="150" height="34" rx="8"/><text x="515" y="274" text-anchor="middle">["bob"] détruit</text>
+    <rect class="bx" x="440" y="292" width="150" height="34" rx="8"/><text x="515" y="314" text-anchor="middle">["chloe"]  =</text>
+  </g>
+  <text x="215" y="274" class="b t-rep" font-size="13.5">remplacé</text>
+  <text x="215" y="314" class="b t-del" font-size="13.5">Plan : 1 add, 3 destroy</text>
+  <text x="615" y="274" class="b t-del" font-size="13.5">seul bob part</text>
+</svg></div>
+<figcaption>Avec <code>count</code>, l'identité d'une instance est sa position. Retirer un élément du milieu déplace les suivants : ils sont remplacés ou détruits.</figcaption>
+</figure>
+
+<div class="box doc"><span class="t">Le conseil de la doc</span>
+<p><code>count</code> pour des instances <b>presque identiques</b> ; <code>for_each</code> « quand certains arguments doivent avoir des valeurs distinctes qui ne se déduisent pas d'un indice entier ».</p>
+<p class="src">developer.hashicorp.com/terraform/language/meta-arguments/count · /for_each</p></div>
+
+<h2>5.3 dynamic : répéter un bloc imbriqué</h2>
+<pre class="code" data-l="hcl">
+resource "aws_elastic_beanstalk_environment" "tfenvtest" {
+  # ...
+  dynamic "setting" {
+    for_each = var.settings
+    content {
+      namespace = setting.value["namespace"]
+      name      = setting.value["name"]
+      value     = setting.value["value"]
+    }
+  }
+}
+</pre>
+<p>Un bloc <code>dynamic "setting"</code> génère un bloc imbriqué <code>setting { … }</code> par élément. L'itérateur s'appelle comme le label (<code>setting</code>) et expose <code>.key</code> et <code>.value</code> (variable <code>iterator</code> pour le renommer).</p>
+<div class="box attention"><span class="t">La doc te prévient</span>
+<p>« Abuser des blocs <code>dynamic</code> rend la configuration difficile à lire et à maintenir. » Utilise-les surtout pour offrir une interface propre dans un module réutilisable, et <b>écris les blocs en toutes lettres quand c'est possible</b>.</p></div>
+
+<h2>5.4 lifecycle : encadrer Terraform</h2>
+<div class="tbl"><table>
+<tr><th>Argument</th><th>Effet</th></tr>
+<tr><td><code>prevent_destroy</code></td><td>Rejette tout plan qui détruirait l'objet, y compris <code>terraform destroy</code>. À utiliser avec parcimonie ; n'agit pas si tu retires le bloc de la config.</td></tr>
+<tr><td><code>create_before_destroy</code></td><td>Crée le remplaçant <b>avant</b> de détruire l'ancien. Optionnel : certains types de ressources ont des conflits de nom.</td></tr>
+<tr><td><code>ignore_changes</code></td><td><code>ignore_changes = [tags]</code> : ces attributs sont exclus de la planification d'update (un outil externe peut les gérer).</td></tr>
+<tr><td><code>replace_triggered_by</code></td><td>Force le remplacement quand une ressource ou un attribut référencé change.</td></tr>
+<tr><td><code>precondition</code> / <code>postcondition</code></td><td>Vérifie une hypothèse avant création / une garantie après création ou lecture. Chacune : <code>condition</code> + <code>error_message</code>.</td></tr>
+</table></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 5</span><h3>count, for_each et protection</h3><span class="dur">≈ 25 min · aucun compte cloud</span></div>
+<ol class="steps">
+<li><b>Crée les deux boucles côte à côte.</b> Dans un dossier <code>td5</code> :
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+variable "noms" {
+  type    = list(string)
+  default = ["alice", "bob", "chloe"]
+}
+
+variable "creer_bonus" {
+  type    = bool
+  default = false
+}
+
+resource "local_file" "avec_count" {
+  count    = length(var.noms)
+  filename = "${path.module}/count-${var.noms[count.index]}.txt"
+  content  = "salut ${var.noms[count.index]}\n"
+}
+
+resource "local_file" "avec_for_each" {
+  for_each = toset(var.noms)
+  filename = "${path.module}/fe-${each.key}.txt"
+  content  = "salut ${each.key}\n"
+}
+
+resource "local_file" "precieux" {
+  filename = "${path.module}/precieux.txt"
+  content  = "a ne pas detruire\n"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "local_file" "bonus" {
+  count    = var.creer_bonus ? 1 : 0
+  filename = "${path.module}/bonus.txt"
+  content  = "bonus\n"
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+$ terraform apply -auto-approve
+$ terraform state list
+</pre>
+<p class="expect">Attendu : « Apply complete! Resources: 7 added ». Regarde les adresses : <code>avec_count[0]</code> contre <code>avec_for_each["alice"]</code>.</p></li>
+<li><b>Retire bob et compare.</b> Ne l'applique pas, lis seulement le plan.
+<pre class="code" data-l="sh">
+$ terraform plan -var='noms=["alice","chloe"]'
+</pre>
+<pre class="code" data-l="out" data-file="extrait, observé">
+  # local_file.avec_count[1] must be replaced
+      ~ filename = "./count-bob.txt" -> "./count-chloe.txt" # forces replacement
+  # local_file.avec_count[2] will be destroyed
+  # (because index [2] is out of range for count)
+  # local_file.avec_for_each["bob"] will be destroyed
+  # (because key ["bob"] is not in for_each map)
+Plan: 1 to add, 0 to change, 3 to destroy.
+</pre>
+<p class="expect">Question : combien de ressources liées à <code>chloe</code> sont touchées côté <code>count</code> ? (Deux : [1] reçoit son nom, [2] disparaît.) Et côté <code>for_each</code> ? (Aucune.)</p></li>
+<li><b>Utilise count comme interrupteur.</b>
+<pre class="code" data-l="sh">
+$ terraform plan -var creer_bonus=true
+</pre>
+<p class="expect">Attendu : <code>local_file.bonus[0] will be created</code> et « Plan: 1 to add ». Avec <code>creer_bonus=false</code> (défaut), rien n'est créé.</p></li>
+<li><b>Teste la protection.</b>
+<pre class="code" data-l="sh">
+$ terraform destroy -auto-approve
+$ terraform state list | wc -l
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+Error: Instance cannot be destroyed
+Resource local_file.precieux has lifecycle.prevent_destroy set, but the plan
+...
+</pre>
+<p class="expect">Le plan est rejeté <b>avant</b> toute destruction : le <code>state list | wc -l</code> affiche toujours 7.</p></li>
+<li><b>Lève la protection et nettoie.</b> Passe <code>prevent_destroy</code> à <code>false</code> dans <code>main.tf</code>, puis :
+<pre class="code" data-l="sh">
+$ terraform destroy -auto-approve
+</pre>
+<p class="expect">Attendu : « Destroy complete! Resources: 7 destroyed. » Pas besoin d'<code>apply</code> avant : <code>lifecycle</code> est lu dans la configuration, pas dans le state. La protection est une décision de configuration, pas un verrou magique.</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<p>Transforme <code>noms</code> en map (<code>{ alice = 8080, bob = 3000 }</code>) et utilise <code>for_each = var.ports</code> avec <code>each.value</code> dans le contenu du fichier : tu as maintenant des valeurs distinctes par instance, le cas d'usage idéal de <code>for_each</code>.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 5</h2>
+<div class="quiz" data-p="5"></div>
+<nav class="pager" aria-label="Parties"><a href="p4.html"><small>← Partie précédente</small>4 · Variables</a><a class="next" href="p6.html"><small>Partie suivante →</small>6 · State</a></nav></main><footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer><script src="data.js"></script><script src="app.js"></script></body></html>

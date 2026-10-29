@@ -1,0 +1,290 @@
+<!--title:Partie 7 · Modules et qualité-->
+<div class="kicker">Partie 7 sur 8 · 16:45 – 17:35</div>
+<h1>Modules et qualité</h1>
+<p class="lead">Quand tu recopies un bloc, c'est qu'il faut un <b>module</b>. Puis tu gardes ton code propre avec le formatage, la validation et les tests.</p>
+
+<div class="box retenir"><span class="t">Objectifs</span>
+<ul>
+<li>Écrire et appeler un module local (variables en entrée, outputs en sortie).</li>
+<li>Passer un module à <code>for_each</code> et refactorer sans détruire.</li>
+<li>Appliquer les conventions de style, <code>fmt</code>, <code>validate</code> et écrire un test <code>.tftest.hcl</code>.</li>
+</ul></div>
+
+<h2>7.1 Qu'est-ce qu'un module ?</h2>
+<p>Un module est « une collection de ressources que Terraform gère ensemble ». Le répertoire racine de ton workspace est le <b>root module</b> ; les modules qu'il appelle via des blocs <code>module</code> sont des <b>child modules</b>. Le même module peut être appelé plusieurs fois, et un module peut en appeler d'autres.</p>
+<div class="box doc"><span class="t">Le conseil de la doc</span>
+<p>Quand tu provisionnes à répétition des ensembles de ressources similaires, « écris des modules réutilisables pour les codifier ». Les modules peuvent venir du <b>système de fichiers local</b>, d'un <b>registre Terraform</b> (public ou privé) ou d'un <b>dépôt VCS</b>.</p>
+<p class="src">developer.hashicorp.com/terraform/language/modules</p></div>
+
+<figure class="sch">
+<div class="scroll">
+<svg viewBox="0 0 800 330" role="img" aria-label="Un module racine appelle deux fois un module enfant avec ses entrées et sorties">
+  <defs><marker id="a7" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arr"/></marker></defs>
+  <rect class="bx2" x="10" y="10" width="780" height="310" rx="18"/>
+  <text x="30" y="36" class="b mut" font-size="13">ROOT MODULE  (ton main.tf)</text>
+  <rect class="c-acc" x="30" y="70" width="240" height="100" rx="14"/>
+  <text x="150" y="100" text-anchor="middle" class="b m t-acc" font-size="15">module "alice"</text>
+  <text x="150" y="126" text-anchor="middle" class="m" font-size="11.5">source = "./modules/salutation"</text>
+  <text x="150" y="146" text-anchor="middle" class="m" font-size="11.5">nom = "Alice"</text>
+  <rect class="c-acc" x="30" y="200" width="240" height="100" rx="14"/>
+  <text x="150" y="230" text-anchor="middle" class="b m t-acc" font-size="15">module "bob"</text>
+  <text x="150" y="256" text-anchor="middle" class="m" font-size="11.5">source = "./modules/salutation"</text>
+  <text x="150" y="276" text-anchor="middle" class="m" font-size="11.5">nom = "Bob"</text>
+  <rect class="c-add" x="335" y="95" width="260" height="130" rx="14"/>
+  <text x="465" y="122" text-anchor="middle" class="b t-add" font-size="15">modules/salutation</text>
+  <text x="465" y="148" text-anchor="middle" class="m" font-size="11.5">variables.tf : var.nom, var.dossier</text>
+  <text x="465" y="168" text-anchor="middle" class="m" font-size="11.5">main.tf : local_file.message</text>
+  <text x="465" y="188" text-anchor="middle" class="m" font-size="11.5">outputs.tf : output "chemin"</text>
+  <text x="465" y="212" text-anchor="middle" class="mut" font-size="12">écrit une fois, appelé deux fois</text>
+  <rect class="c-chg" x="645" y="115" width="135" height="90" rx="14"/>
+  <text x="712" y="146" text-anchor="middle" class="b m t-chg" font-size="10.5">module.alice.chemin</text>
+  <text x="712" y="168" text-anchor="middle" class="b m t-chg" font-size="10.5">module.bob.chemin</text>
+  <text x="712" y="192" text-anchor="middle" class="mut" font-size="12">sorties lues</text>
+  <path class="ln" d="M270 120 L331 140" marker-end="url(#a7)"/>
+  <path class="ln" d="M270 250 L331 190" marker-end="url(#a7)"/>
+  <path class="ln" d="M595 160 L641 160" marker-end="url(#a7)"/>
+  <text x="300" y="104" text-anchor="middle" class="mut" font-size="12">entrées</text>
+  <text x="618" y="150" text-anchor="middle" class="mut" font-size="12">sorties</text>
+</svg></div>
+<figcaption>Les variables du module sont ses entrées, ses outputs sont ses sorties : <code>module.NOM.SORTIE</code>.</figcaption>
+</figure>
+
+<h2>7.2 Écrire et appeler un module</h2>
+<pre class="code" data-l="hcl" data-file="modules/salutation/main.tf">
+terraform {
+  required_providers {
+    local = {
+      source = "hashicorp/local"
+    }
+  }
+}
+
+resource "local_file" "message" {
+  filename = "${var.dossier}/${lower(var.nom)}.txt"
+  content  = "Salut ${var.nom} !\n"
+}
+</pre>
+<pre class="code" data-l="hcl" data-file="main.tf (appel)">
+module "alice" {
+  source  = "./modules/salutation"
+  nom     = "Alice"
+  dossier = "${path.module}/out"
+}
+</pre>
+<p>Après avoir ajouté ou modifié un module, relance <code>terraform init</code> : il installe les modules enfants (« Initializing modules… »). Dans le state, les ressources d'un module ont une adresse préfixée : <code>module.alice.local_file.message</code>.</p>
+
+<h2>7.3 Les conventions de la doc</h2>
+<div class="tbl"><table>
+<tr><th>Fichier</th><th>Contenu conseillé</th></tr>
+<tr><td><code>terraform.tf</code></td><td>un seul bloc <code>terraform</code> avec <code>required_version</code> et <code>required_providers</code></td></tr>
+<tr><td><code>providers.tf</code></td><td>tous les blocs <code>provider</code></td></tr>
+<tr><td><code>backend.tf</code></td><td>la configuration du backend</td></tr>
+<tr><td><code>main.tf</code></td><td>ressources et data sources</td></tr>
+<tr><td><code>variables.tf</code> · <code>outputs.tf</code></td><td>variables · outputs, en ordre alphabétique</td></tr>
+<tr><td><code>locals.tf</code></td><td>locals partagés entre fichiers (sinon en haut du fichier qui les utilise)</td></tr>
+</table></div>
+<div class="pair">
+<div class="good"><b>À faire</b><ul style="margin:0;padding-left:1.1rem">
+<li>2 espaces par niveau, <code>=</code> alignés</li>
+<li><code>count</code> / <code>for_each</code> en premier, puis les arguments, les blocs, <code>lifecycle</code>, <code>depends_on</code> à la fin</li>
+<li><code>type</code> et <code>description</code> sur chaque variable et output</li>
+<li><code>sensitive = true</code> pour mots de passe et clés</li>
+<li>noms en noms descriptifs avec underscores</li>
+</ul></div>
+<div class="bad"><b>À éviter</b><ul style="margin:0;padding-left:1.1rem">
+<li>répéter le type dans le nom (<code>local_file "local_file_1"</code>)</li>
+<li>commentaires <code>//</code> et <code>/* */</code></li>
+<li>abuser de variables et de locals</li>
+<li><code>validation</code> partout : seulement si les valeurs ont des contraintes strictes</li>
+</ul></div></div>
+<p class="src">developer.hashicorp.com/terraform/language/style</p>
+
+<h2>7.4 fmt, validate, test</h2>
+<div class="tbl"><table>
+<tr><th>Outil</th><th>Ce qu'il apporte</th></tr>
+<tr><td><code>terraform fmt</code></td><td>Reformate au style canonique. <code>-recursive</code> descend dans les sous-dossiers, <code>-check</code> vérifie sans écrire (code 0 si tout est formaté, non nul sinon), <code>-diff</code> montre les changements.</td></tr>
+<tr><td><code>terraform validate</code></td><td>Syntaxe et cohérence interne (noms d'attributs, types), sans variables ni services distants. À lancer après <code>init</code> (ou <code>init -backend=false</code>).</td></tr>
+<tr><td><code>terraform test</code></td><td>Fichiers <code>.tftest.hcl</code> : blocs <code>run</code> (<code>command = plan</code> ou <code>apply</code>, <code>apply</code> par défaut) avec des <code>assert</code> (<code>condition</code> + <code>error_message</code>).</td></tr>
+</table></div>
+<pre class="code" data-l="hcl" data-file="equipe.tftest.hcl">
+run "chemins_attendus" {
+  command = plan            # pas d'infrastructure créée : comme un test unitaire
+
+  assert {
+    condition     = output.chemins["alice"] == "./out/alice.txt"
+    error_message = "Le chemin d'alice est inattendu."
+  }
+}
+</pre>
+<div class="box astuce"><span class="t">Astuce</span>
+<p>Dans la CI, enchaîne <code>terraform fmt -check</code> → <code>terraform validate</code> → <code>terraform test</code>. La doc de style conseille aussi un linter comme TFLint pour les règles propres à ton organisation.</p></div>
+
+<div class="td">
+<div class="hd"><span class="badge">TD 7</span><h3>Ton premier module, puis for_each, fmt et test</h3><span class="dur">≈ 30 min · aucun compte cloud</span></div>
+<ol class="steps">
+<li><b>Crée le module.</b> Dans un dossier <code>td7</code> :
+<pre class="code" data-l="sh">
+$ mkdir -p modules/salutation
+</pre>
+<pre class="code" data-l="hcl" data-file="modules/salutation/variables.tf">
+variable "nom" {
+  type        = string
+  description = "Personne a saluer"
+}
+
+variable "dossier" {
+  type        = string
+  description = "Dossier de sortie"
+}
+</pre>
+<pre class="code" data-l="hcl" data-file="modules/salutation/main.tf">
+terraform {
+  required_providers {
+    local = {
+      source = "hashicorp/local"
+    }
+  }
+}
+
+resource "local_file" "message" {
+  filename = "${var.dossier}/${lower(var.nom)}.txt"
+  content  = "Salut ${var.nom} !\n"
+}
+</pre>
+<pre class="code" data-l="hcl" data-file="modules/salutation/outputs.tf">
+output "chemin" {
+  description = "Chemin du fichier cree"
+  value       = local_file.message.filename
+}
+</pre></li>
+<li><b>Appelle-le deux fois.</b>
+<pre class="code" data-l="hcl" data-file="main.tf">
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+module "alice" {
+  source  = "./modules/salutation"
+  nom     = "Alice"
+  dossier = "${path.module}/out"
+}
+
+module "bob" {
+  source  = "./modules/salutation"
+  nom     = "Bob"
+  dossier = "${path.module}/out"
+}
+
+output "chemins" {
+  value = [module.alice.chemin, module.bob.chemin]
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+$ terraform apply -auto-approve
+$ terraform state list
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+Initializing modules...
+- alice in modules/salutation
+- bob in modules/salutation
+...
+chemins = [
+  "./out/alice.txt",
+  "./out/bob.txt",
+]
+module.alice.local_file.message
+module.bob.local_file.message
+</pre></li>
+<li><b>Refactore en for_each sans rien détruire.</b> Remplace les deux blocs <code>module</code> et l'output par :
+<pre class="code" data-l="hcl">
+module "equipe" {
+  for_each = toset(["alice", "bob"])
+
+  source  = "./modules/salutation"
+  nom     = title(each.key)
+  dossier = "${path.module}/out"
+}
+
+moved {
+  from = module.alice
+  to   = module.equipe["alice"]
+}
+
+moved {
+  from = module.bob
+  to   = module.equipe["bob"]
+}
+
+output "chemins" {
+  value = [for m in module.equipe : m.chemin]
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform init
+$ terraform plan
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+  # module.alice.local_file.message has moved to module.equipe["alice"].local_file.message
+  # module.bob.local_file.message has moved to module.equipe["bob"].local_file.message
+Plan: 0 to add, 0 to change, 0 to destroy.
+</pre>
+<p class="expect">Les ressources gardent leur existence : elles changent juste d'adresse. Fais <code>terraform apply -auto-approve</code> puis <code>terraform state list</code>.</p></li>
+<li><b>Formate et valide.</b> Crée un fichier mal formaté, constate, corrige.
+<pre class="code" data-l="sh">
+$ printf 'variable   "x"   {\ntype=string\n    default = "a"\n}\n' &gt; mal.tf
+$ terraform fmt -check ; echo "code retour : $?"
+$ terraform fmt -diff mal.tf
+$ terraform validate
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+mal.tf
+code retour : 3
+--- old/mal.tf
++++ new/mal.tf
+@@ -1,4 +1,4 @@
+-variable   "x"   {
+-type=string
+-    default = "a"
++variable "x" {
++  type    = string
++  default = "a"
+ }
+Success! The configuration is valid.
+</pre>
+<p class="expect">Le code de retour non nul (3 ici) liste le fichier fautif : exactement ce qu'une CI exploite. Supprime ensuite <code>mal.tf</code>.</p></li>
+<li><b>Écris un test.</b> Crée <code>equipe.tftest.hcl</code> :
+<pre class="code" data-l="hcl" data-file="equipe.tftest.hcl">
+run "deux_fichiers" {
+  command = plan
+
+  assert {
+    condition     = length(output.chemins) == 2
+    error_message = "Il devrait y avoir deux fichiers."
+  }
+}
+</pre>
+<pre class="code" data-l="sh">
+$ terraform test
+</pre>
+<pre class="code" data-l="out" data-file="observé">
+equipe.tftest.hcl... in progress
+  run "deux_fichiers"... pass
+equipe.tftest.hcl... tearing down
+equipe.tftest.hcl... pass
+
+Success! 1 passed, 0 failed.
+</pre>
+<p class="expect">Casse-le volontairement (<code>== 3</code>) : Terraform affiche un diff et ton <code>error_message</code>. Nettoie avec <code>terraform destroy -auto-approve</code>.</p></li>
+</ol>
+<details class="sol"><summary>Pour aller plus loin</summary>
+<p>Ajoute <code>"chloe"</code> à l'ensemble : un seul nouveau fichier est créé, les autres ne bougent pas. C'est tout l'intérêt de <code>for_each</code> sur un module.</p></details>
+</div>
+
+<h2>Mini-quiz de la partie 7</h2>
+<div class="quiz" data-p="7"></div>

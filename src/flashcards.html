@@ -1,0 +1,27 @@
+<!--title:Flashcards Terraform-->
+<div class="kicker">Outil · mémorisation</div>
+<h1>Flashcards</h1>
+<p class="lead">75 cartes tirées des 8 parties. Lis la question, devine, retourne la carte, puis dis honnêtement si tu savais.</p>
+<div class="fc-bar" id="fc-chips" role="group" aria-label="Filtrer les cartes"></div>
+<div class="fc-prog" aria-hidden="true"><i></i></div>
+<div id="fc-info" class="src" aria-live="polite"></div>
+
+<div id="fc-app">
+<div class="fc">
+<div class="fc-in" role="button" tabindex="0" aria-label="Carte">
+<div class="face front"><div class="tag"></div><div class="txt"></div><div class="src" style="margin-top:14px">Clique ou appuie sur Espace pour retourner</div></div>
+<div class="face back"><div class="tag"></div><div class="txt"></div></div>
+</div></div>
+<div class="fc-act">
+<button type="button" class="btn ghost" id="fc-again">✗ À revoir</button>
+<button type="button" class="btn" id="fc-ok">✓ Je savais</button>
+</div>
+<p class="src" style="text-align:center">Raccourcis : Espace = retourner · ← à revoir · → je savais</p>
+</div>
+<div id="fc-empty" class="box doc" hidden><span class="t">Bravo</span><p>Plus aucune carte à revoir dans cette sélection.</p></div>
+
+<div class="fc-act" style="margin-top:22px">
+<button type="button" class="btn ghost" id="fc-shuffle">Mélanger</button>
+<button type="button" class="btn ghost" id="fc-reset">Tout remettre à zéro</button>
+</div>
+<p class="src" style="text-align:center">Ta progression est mémorisée dans ce navigateur uniquement.</p>

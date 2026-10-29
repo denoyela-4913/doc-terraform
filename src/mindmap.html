@@ -1,0 +1,69 @@
+<!--title:Mindmap Terraform-->
+<style>
+:root { --b1: #2f6fdb; --b2: #0e8a8a; --b3: #2e8b3d; --b4: #9a7a00; --b5: #d2691e; --b6: #c0392b; --b7: #b0306f; --b8: #7b44d1; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --b1: #6fa3ff; --b2: #4fd6d0; --b3: #6fd47c; --b4: #e6c24a; --b5: #ff9b5e; --b6: #ff7b6e; --b7: #ff7fc0; --b8: #b896ff; } }
+:root[data-theme="dark"] { --b1: #6fa3ff; --b2: #4fd6d0; --b3: #6fd47c; --b4: #e6c24a; --b5: #ff9b5e; --b6: #ff7b6e; --b7: #ff7fc0; --b8: #b896ff; }
+.mm .leaf rect { fill: color-mix(in srgb, var(--bc) 14%, var(--surface)); stroke: var(--bc); stroke-width: 1.4; }
+.mm .leaf text { fill: var(--ink); font-size: 13.5px; }
+.mm .bnode rect { fill: var(--bc); }
+.mm .bnode text { fill: var(--accent-ink); font-weight: 800; font-size: 15px; font-family: var(--display); }
+.mm .link { fill: none; stroke: var(--bc); stroke-width: 2.2; opacity: .75; }
+.mm .center rect { fill: var(--accent); }
+.mm .center text { fill: var(--accent-ink); font: 800 24px var(--display); }
+.mm .leaf:hover rect, .mm .leaf:focus rect { stroke-width: 2.6; fill: color-mix(in srgb, var(--bc) 28%, var(--surface)); }
+</style>
+<div class="kicker">Outil · vue d'ensemble</div>
+<h1>Mindmap</h1>
+<p class="lead">Terraform sur une page : une branche par partie du parcours. Clique une feuille pour aller à la partie correspondante.</p>
+<div class="mm"><svg id="map" viewBox="0 0 1180 780" role="img" aria-label="Carte mentale de Terraform"></svg></div>
+<p class="src">Sur téléphone, fais défiler la carte horizontalement.</p>
+
+<script>
+(function () {
+  var data = [
+    { n: 1, t: "Le déclic", c: "var(--b1)", leaves: ["IaC : décrire l'état voulu", "Write → Plan → Apply", "init, plan, apply, destroy", "Symboles + ~ - -/+", "Premier main.tf"] },
+    { n: 2, t: "Parler HCL", c: "var(--b2)", leaves: ["Arguments et blocs", "Types et conversions", "Références var. local. data.", "Conditions et for", "Fonctions, terraform console"] },
+    { n: 3, t: "Providers & data", c: "var(--b3)", leaves: ["required_providers", "Versions : ~> 1.0.4", "resource et data", "Dépendances implicites", "terraform graph"] },
+    { n: 4, t: "Variables & outputs", c: "var(--b4)", leaves: ["variable et validation", "Précédence -var > default", "locals", "outputs", "sensitive ≠ secret"] },
+    { n: 5, t: "Boucles & lifecycle", c: "var(--b5)", leaves: ["count et count.index", "for_each : map ou set", "Piège : count sur liste", "dynamic (avec parcimonie)", "prevent_destroy, ignore_changes"] },
+    { n: 6, t: "State & backends", c: "var(--b6)", leaves: ["Le triangle config / state / réel", "Backends et verrou", "moved et import", "plan -refresh-only", "Workspaces"] },
+    { n: 7, t: "Modules & qualité", c: "var(--b7)", leaves: ["Root et child modules", "module.nom.sortie", "Style et fichiers", "fmt et validate", "terraform test"] },
+    { n: 8, t: "Pro", c: "var(--b8)", leaves: ["Secrets, state, éphémère", "plan -out puis apply", "-detailed-exitcode, CI", "TF_LOG, provisioners", "Projet Docker nginx"] }
+  ];
+  var NS = "http://www.w3.org/2000/svg", svg = document.getElementById("map");
+  var W = 1180, H = 780, cx = W / 2, cy = H / 2, rowH = 30, gap = 22;
+  function el(n, a, p) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+  function txt(p, x, y, s, anchor) { var t = el("text", { x: x, y: y, "text-anchor": anchor || "start" }, p); t.textContent = s; return t; }
+  // centre
+  var c = el("g", { "class": "center" }, svg);
+  el("rect", { x: cx - 74, y: cy - 28, width: 148, height: 56, rx: 28 }, c);
+  txt(c, cx, cy + 8, "Terraform", "middle");
+  [0, 1].forEach(function (side) {
+    var group = data.slice(side * 4, side * 4 + 4), dir = side === 0 ? 1 : -1;
+    var blockH = group.map(function (b) { return b.leaves.length * rowH; });
+    var total = blockH.reduce(function (a, b) { return a + b; }, 0) + gap * 3;
+    var y0 = (H - total) / 2;
+    group.forEach(function (b, i) {
+      var h = blockH[i], top = y0, mid = top + h / 2; y0 += h + gap;
+      var bx = side === 0 ? cx + 150 : cx - 150 - 170;
+      var g = el("g", { "class": "br", style: "--bc:" + b.c }, svg);
+      var bxMid = bx + (side === 0 ? 0 : 170);
+      // centre -> branche
+      var sx = side === 0 ? cx + 74 : cx - 74;
+      el("path", { "class": "link", d: "M" + sx + " " + cy + " C" + (sx + dir * 50) + " " + cy + " " + (bxMid - dir * 50) + " " + mid + " " + bxMid + " " + mid }, g);
+      var bn = el("g", { "class": "bnode" }, g);
+      el("rect", { x: bx, y: mid - 20, width: 170, height: 40, rx: 20 }, bn);
+      txt(bn, bx + 85, mid + 5.5, b.n + " · " + b.t, "middle");
+      var lx = side === 0 ? bx + 170 + 40 : bx - 40 - 215;
+      b.leaves.forEach(function (l, j) {
+        var ly = top + j * rowH + rowH / 2;
+        var a = el("a", { href: "p" + b.n + ".html", "class": "leaf", "aria-label": "Partie " + b.n + " : " + l }, g);
+        var ex = side === 0 ? bx + 170 : bx;
+        el("path", { "class": "link", d: "M" + ex + " " + mid + " C" + (ex + dir * 22) + " " + mid + " " + (lx - dir * 22 + (side === 0 ? 0 : 215)) + " " + ly + " " + (side === 0 ? lx : lx + 215) + " " + ly, opacity: .45 }, g);
+        el("rect", { x: lx, y: ly - 12, width: 215, height: 24, rx: 8 }, a);
+        txt(a, lx + 10, ly + 4.8, l);
+      });
+    });
+  });
+})();
+</script>
