@@ -1,0 +1,61 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="claude:viewport-fit-sides" content="cover"><title>Pièges et astuces Terraform</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"><link rel="stylesheet" href="style.css"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body><header class="top"><div class="top-in"><a class="brand" href="index.html"><i><b></b><b></b><b></b><b></b></i>Terraform en un jour</a><nav class="nav" aria-label="Navigation"><a href="index.html">Accueil</a><a href="p1.html">1 · Le déclic</a><a href="p2.html">2 · Parler HCL</a><a href="p3.html">3 · Providers</a><a href="p4.html">4 · Variables</a><a href="p5.html">5 · Boucles</a><a href="p6.html">6 · State</a><a href="p7.html">7 · Modules</a><a href="p8.html">8 · Pro</a><a href="flashcards.html">Flashcards</a><a href="mindmap.html">Mindmap</a><a href="fiche.html">Fiche</a><a href="bd.html">BD</a><a href="pieges.html" aria-current="page">Pièges</a><a href="quiz.html">Quiz final</a><a href="sources.html">Sources</a></nav><button class="theme" type="button">Thème</button></div></header><main class="wrap" id="main"><div class="kicker">Outil · tips and tricks</div>
+<h1>Pièges et astuces</h1>
+<p class="lead">Ce qu'il vaut mieux ne pas faire, et le bon réflexe à la place. Chaque conseil est rattaché à la doc officielle ou à une expérience réelle.</p>
+
+<h2>Les 10 pièges classiques</h2>
+
+<div class="pair"><div class="bad"><b>Piège</b>Utiliser <code>count</code> sur une liste qui change : retirer un élément du milieu décale les indices.</div>
+<div class="good"><b>Réflexe</b>Utiliser <code>for_each</code> sur un set ou une map. Observé : avec <code>count</code>, retirer <code>bob</code> remplace [1] et détruit [2] ; avec <code>for_each</code>, seul <code>bob</code> part.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Prendre <code>sensitive = true</code> pour un coffre-fort.</div>
+<div class="good"><b>Réflexe</b>C'est un masque d'affichage. La valeur reste dans le state et les plans. Chiffre et restreins le state, et préfère les valeurs <code>ephemeral</code>. Observé : <code>terraform output NOM</code> la montre en clair.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Renommer une ressource dans le code sans <code>moved</code>.</div>
+<div class="good"><b>Réflexe</b>Ajoute <code>moved { from = … to = … }</code> : le plan affiche « has moved to ». Observé : sans lui, « 2 to add, 2 to destroy ». Garde les blocs <code>moved</code> (les retirer est cassant).</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Utiliser <code>-target</code> en routine.</div>
+<div class="good"><b>Réflexe</b>Réserve-le aux cas exceptionnels (réparer, contourner une limite). La doc avertit d'une dérive non détectée.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Éditer <code>terraform.tfstate</code> à la main, ou le committer dans Git.</div>
+<div class="good"><b>Réflexe</b>Passe par <code>terraform state</code>. Stocke le state dans un backend distant, chiffré, avec verrou et contrôle d'accès.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Ajouter <code>depends_on</code> « pour être sûr ».</div>
+<div class="good"><b>Réflexe</b>Référence un attribut : la dépendance est alors implicite. <code>depends_on</code> est un dernier recours, il rend les plans plus conservateurs.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Utiliser les workspaces pour isoler dev et prod.</div>
+<div class="good"><b>Réflexe</b>La doc : ils partagent le même backend, ce n'est pas une isolation adaptée. Sépare configurations et backends.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Mettre des variables ou des identifiants dans le bloc <code>backend</code>.</div>
+<div class="good"><b>Réflexe</b>Le bloc backend n'accepte ni variables ni locals. Passe les valeurs avec <code>-backend-config</code> et les identifiants via l'environnement.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b><code>apply -auto-approve</code> sans avoir relu le plan, ou <code>-lock=false</code>.</div>
+<div class="good"><b>Réflexe</b>Planifie dans un fichier (<code>-out</code>), relis, applique ce fichier. Attends le verrou avec <code>-lock-timeout</code>.</div></div>
+
+<div class="pair"><div class="bad"><b>Piège</b>Ne pas committer <code>.terraform.lock.hcl</code>.</div>
+<div class="good"><b>Réflexe</b>La doc le recommande : toute l'équipe et la CI obtiennent les mêmes versions de providers.</div></div>
+
+<h2>Les astuces qui font gagner du temps</h2>
+<div class="grid">
+<div class="box astuce" style="margin:0"><span class="t">Console</span><p><code>terraform console</code> pour tester une fonction ou une expression sans rien déployer. En script : <code>echo 'upper("a")' | terraform console</code>.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Formater d'un coup</span><p><code>terraform fmt -recursive</code> corrige tout le dépôt ; <code>fmt -check</code> sert de garde dans la CI.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Plan sauvegardé</span><p><code>plan -out=tfplan</code> puis <code>apply tfplan</code> : tu appliques exactement ce que tu as relu.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Scripter sans lire le state</span><p><code>terraform output -json</code> et <code>terraform show -json</code> plutôt que d'analyser le fichier.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Variable d'environnement</span><p><code>export TF_VAR_environnement=staging</code> : pratique en CI, mais la source la plus faible avant <code>default</code>.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Remplacer une ressource</span><p><code>plan -replace=ADRESSE</code> force le remplacement d'une instance. Observé : ses dépendants sont remplacés aussi.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Détecter la dérive</span><p><code>plan -refresh-only</code> montre ce qui a changé hors de Terraform sans rien défaire.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Voir le graphe</span><p><code>terraform graph | dot -Tpng &gt; graphe.png</code> (nécessite Graphviz) pour comprendre l'ordre des opérations.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Cache des providers</span><p><code>TF_PLUGIN_CACHE_DIR</code> évite de retélécharger les mêmes providers dans chaque dossier de TD.</p></div>
+<div class="box astuce" style="margin:0"><span class="t">Journaux ciblés</span><p><code>TF_LOG_PROVIDER</code> ou <code>TF_LOG_CORE</code> pour ne voir que les logs d'un côté ; <code>TF_LOG_PATH</code> exige que <code>TF_LOG</code> soit défini.</p></div>
+</div>
+
+<h2>Check-list avant de partager ton code</h2>
+<div class="box retenir"><span class="t">Avant un commit</span>
+<ul>
+<li><code>terraform fmt -recursive</code> puis <code>terraform validate</code>.</li>
+<li>Chaque variable et output a un <code>type</code> et une <code>description</code>.</li>
+<li>Les secrets ont <code>sensitive = true</code> <b>et</b> ne sont pas dans les fichiers versionnés.</li>
+<li>Les versions de providers sont contraintes (<code>~&gt;</code>) et <code>.terraform.lock.hcl</code> est committé.</li>
+<li>Pas de <code>terraform.tfstate</code>, pas de <code>.terraform/</code>, pas de fichier de plan dans Git.</li>
+<li>Un plan a été relu avant tout apply en environnement partagé.</li>
+</ul></div>
+</main><footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer><script src="data.js"></script><script src="app.js"></script></body></html>

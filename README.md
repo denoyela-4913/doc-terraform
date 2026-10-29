@@ -19,3 +19,7 @@ Publié en Artifact : https://claude.ai/artifact/2UVzJzdRdaH323CfQ29KsX
 
 ## Licence
 MIT (voir `LICENSE`). Projet personnel, non affilié à HashiCorp ; Terraform est une marque de HashiCorp.
+
+## GitHub Pages
+    python3 build.py --pages && cp style.css app.js data.js docs/
+Le site est servi depuis `docs/` (branche `master`). `out/` sert à la publication en Artifact.

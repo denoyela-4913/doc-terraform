@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Assemble les pages : src/<nom>.html (fragment) -> out/<nom>.html."""
+"""Assemble les pages : src/<nom>.html (fragment) -> out/<nom>.html.
+--pages : documents complets pour GitHub Pages -> docs/"""
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "out")
+PAGES = "--pages" in sys.argv
+sys.argv = [a for a in sys.argv if a != "--pages"]
+OUT = os.path.join(HERE, "docs" if PAGES else "out")
 os.makedirs(OUT, exist_ok=True)
 
 PARTS = [(1,"Le déclic"),(2,"Parler HCL"),(3,"Providers"),(4,"Variables"),(5,"Boucles"),(6,"State"),(7,"Modules"),(8,"Pro")]
@@ -34,7 +37,7 @@ def build(name):
     body = header(name) + '<main class="%s" id="main">%s%s</main>' % ("wide" if name in ("mindmap.html","fiche.html","bd.html") else "wrap", src, pager(name))
     foot = '<footer class="foot wrap">Contenu fondé sur la documentation officielle HashiCorp Terraform (v1.17.x) ; les sorties « observé » viennent d\'exécutions réelles avec Terraform 1.17.0. Projet de formation personnel, non affilié à HashiCorp. <a href="sources.html">Sources</a></footer>'
     scripts = '<script src="data.js"></script><script src="app.js"></script>'
-    if name == "index.html":
+    if name == "index.html" and not PAGES:
         # page principale : fragment, le squelette est ajouté à la publication
         html = ('<title>%s</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n%s\n<link rel="stylesheet" href="style.css">\n'
                 '<div %s>%s%s%s</div>' % (title, FONTS, body_attr, body, foot, scripts))
