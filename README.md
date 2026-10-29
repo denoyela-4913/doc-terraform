@@ -16,3 +16,6 @@ Publié en Artifact : https://claude.ai/artifact/2UVzJzdRdaH323CfQ29KsX
 
 ## Voir en local
     python3 serve.py
+
+## Licence
+MIT (voir `LICENSE`). Projet personnel, non affilié à HashiCorp ; Terraform est une marque de HashiCorp.
