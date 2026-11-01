@@ -30,3 +30,14 @@ Le site est servi depuis `docs/` (branche `master`). `out/` sert à la publicati
     python3 check_sync.py                 # assets et pages out/ vs docs/
     python3 check_sync.py DOSSIER         # + compare à l'Artifact
 `DOSSIER` contient les fichiers publiés de l'Artifact (dans Claude Code : demander « vérifie la synchro de l'artifact », il les télécharge puis lance le script). `index.html` est comparé par inclusion, car la plateforme l'enveloppe dans un document.
+
+## Republier l'Artifact
+L'Artifact (lien en haut) se met à jour sur place, le lien ne change pas.
+
+1. Modifier `src/`, `data.js`, `style.css`, `app.js` ou `bd/`.
+2. Reconstruire : `python3 build.py && cp -r style.css app.js data.js bd out/`
+3. Dans Claude Code, demander : « republie l'artifact avec out/ ». Claude publie `out/index.html` comme page, avec le reste de `out/` en fichiers associés, sur le même lien.
+4. Vérifier : « vérifie la synchro de l'artifact » (voir plus haut).
+5. Pour GitHub Pages, reconstruire aussi `docs/` (voir plus haut), puis commiter et pousser.
+
+Seul `index.html` est la page de l'Artifact ; les autres pages et les images sont publiées en fichiers associés. Il faut donc toujours republier tout `out/`, pas un seul fichier, pour rester aligné.
